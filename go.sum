@@ -4,6 +4,8 @@ github.com/voodooEntity/gits v0.0.19 h1:s1HkgZFwj8zP15849wb0QRRKm3PHnMKCFmdIeNk6
 github.com/voodooEntity/gits v0.0.19/go.mod h1:8spOvNEi3UeUTqbRtZZaYmUUVMBmvrR/k6LMOIkbXkc=
 github.com/voodooEntity/gitsapi v0.0.17 h1:RVjw6aWkBEw75aFqEi5N2WooXstj0piaV/jx5eOLwV0=
 github.com/voodooEntity/gitsapi v0.0.17/go.mod h1:zljkzRReB5bSa279TxcQpfdUXAN33B4vNp/VnM3LrNc=
+github.com/voodooEntity/gitsapi v0.0.18 h1:4tC4Abn5JJ8OXMjKP0JF4iwSbXQcaLtLFqv3HC5pt9o=
+github.com/voodooEntity/gitsapi v0.0.18/go.mod h1:zljkzRReB5bSa279TxcQpfdUXAN33B4vNp/VnM3LrNc=
 github.com/voodooEntity/go-cyberbrain-plugin-interface v0.0.0-20230529093930-c4250e4ac874 h1:G4mZsy+t99Zq34eRnnZsXwMVjEHITGJqas5ANCOycEI=
 github.com/voodooEntity/go-cyberbrain-plugin-interface v0.0.0-20230529093930-c4250e4ac874/go.mod h1:lcA5LXTQcjpRltcwmyo77g+rwm3ln6Mdys+lnnLCtj4=
 github.com/voodooEntity/go-cyberbrain-plugin-interface v0.0.0-20230529094852-f3f85a1ac5c1 h1:Kg609lrNbtBZJ4JTNhN+vQvy7zAZjOFR2J9gtqe2J3w=
