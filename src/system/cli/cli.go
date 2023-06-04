@@ -3,54 +3,58 @@ package cli
 import (
 	"flag"
 	"github.com/voodooEntity/archivist"
-	"log"
 	"os"
 )
 
 type Args struct {
-	PluginSource string
-	ProjectPath  string
-	Command      string
-	Verbose      bool
+	ProjectPath string
+	Filter      string
+	Command     string
+	Verbose     bool
 }
 
-var shell string
 var Data Args
-var loggerOut = log.New(os.Stdout, "", 0)
 
 func ParseArgs() {
-	// first we check for the help flag
+	if 2 > len(os.Args) {
+		PrintHelpText()
+	}
+	command := os.Args[1]
+	os.Args = os.Args[1:]
+
 	if 1 < len(os.Args) {
 		if ok := os.Args[1]; ok == "help" {
 			PrintHelpText()
-			os.Exit(1)
+
 		}
 	}
 
-	// plugin source director - to grab the code for new plugins
-	var pluginSource string
-	flag.StringVar(&pluginSource, "source", "", "The plugin code source directory path")
+	cwd, err := os.Getwd()
+	if err != nil {
+		archivist.Error("could not retrieve cwd: ", err.Error())
+		os.Exit(1)
+	}
 
 	// the project path for plugin compiling and config checking
 	var projectPath string
-	flag.StringVar(&projectPath, "project", "", "Your project directory path")
+	flag.StringVar(&projectPath, "project", cwd+"/", "Your project directory path")
 
-	// amount of runs in case you dont provide input
-	var Command string
-	flag.StringVar(&Command, "command", "", "Command to be executed")
+	// filter var
+	var filter string
+	flag.StringVar(&filter, "filter", "", "Filter string to be applied")
 
 	// verbose output flag
-	verboseFlag := flag.Bool("verbose", false, "Enable verbose mode")
+	var verboseFlag bool
+	flag.BoolVar(&verboseFlag, "verbose", false, "Verbose logging flag")
 
 	flag.Parse()
 
 	Data = Args{
-		PluginSource: pluginSource,
-		ProjectPath:  projectPath,
-		Command:      Command,
-		Verbose:      *verboseFlag,
+		ProjectPath: projectPath,
+		Filter:      filter,
+		Verbose:     verboseFlag,
+		Command:     command,
 	}
-
 }
 
 func PrintHelpText() {
@@ -59,16 +63,32 @@ func PrintHelpText() {
 		"  build or test plugins for your cyberbrain application - or start the cyberbrain \n" +
 		"  application to run. For further information please check the docs in the reps\n" +
 		"   https://github.com/voodooEntity/go-cyberbrain readme.\n\n" +
-		"  Args: \n" +
-		"    -source \"/path/to/source/\"    | Path to the directory holding your plugin's sourcecode\n" +
-		"    -project \"/path/to/source/\"   | Path your project has been inited in. Will hold the builded\n" +
-		"                                      plugins for your app and optional a config (not supported yet)\n" +
-		"    -command \"commandname\"        | The command you want to execut. Right now you can use\n" +
-		"                                      run   (will start the application with the plugins given)\n" +
-		"                                      buildPlugins ( will build the plugins from provided -source path\n" +
-		"                                                    to provided -project provided path )\n" +
-		"                                      testPlugin ( will testrun the plugin source at the given -source \n" +
-		"                                                    path using the provided testdata.json )\n" +
-		"    --verbose                    | Activates verbose output mode\n"
+		"  The cli interface has to be called like\n" +
+		"  cyberbrain <command> [+<args>]\n\n" +
+		"  Commands: \n" +
+		"    build\n" +
+		"     - Builds given plugin source codes to cyberbrain plugins. \n" +
+		"     - Args: -project\n\n" +
+		"    test\n" +
+		"     - Tests plugins in a given project. This is meant to test if a plugin runs with\n" +
+		"       cyberbrain. To test plugins you need to provide a test.json in the plugin source\n" +
+		"       directory. Testing plugins will also result in building the plugins. This is necessary\n" +
+		"       for cyberbrain to test-run them. If you prefer to only run a specific test rather than\n" +
+		"       testing all plugins you can use the filter param which compares a string to the available\n" +
+		"       plugins names.\n" +
+		"     - Args: -project -filter\n\n" +
+		"    run\n" +
+		"     - Args: -project\n\n" +
+		"    help\n" +
+		"     - Prints the help -text your are just reading.\n\n" +
+		"    version\n" +
+		"     - Prints the current deployed version of cyberbrain\n\n" +
+		"  Args explained: \n" +
+		"    -project \"/path/to/projec/\"   | Path your project. This should hold the source codes for\n" +
+		"                                      your plugins and also the project config. Plugins will be\n" +
+		"                                      build to PROJECTPATH/plugins. The default value will be the\n" +
+		"                                      current working directory.\n\n" +
+		"    --verbose                     | Activates verbose output mode\n"
 	archivist.Info(helpText)
+	os.Exit(1)
 }

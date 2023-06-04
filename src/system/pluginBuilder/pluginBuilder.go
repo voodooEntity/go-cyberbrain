@@ -12,8 +12,11 @@ import (
 
 var shell string
 
-func BuildPlugins(pluginsPath string, abilitiesPath string) {
-	archivist.Info("| Running cyberbrain PluginBuilder.")
+func BuildPlugins(pluginsPath string, abilitiesPath string, filter string) {
+	archivist.Info("+ Running cyberbrain PluginBuilder.")
+	if "" != filter {
+		archivist.Info("+ filter applied '" + filter + "'")
+	}
 	// running a detection for what shell to use to build the plugins
 	detectShell()
 
@@ -24,6 +27,9 @@ func BuildPlugins(pluginsPath string, abilitiesPath string) {
 	}
 
 	for _, ability := range abilities {
+		if !strings.Contains(ability, filter) {
+			continue
+		}
 		archivist.Info("++ Plugin: " + ability)
 		err := BuildPlugin(pluginsPath, abilitiesPath, ability)
 		if nil != err {
@@ -34,8 +40,7 @@ func BuildPlugins(pluginsPath string, abilitiesPath string) {
 }
 
 func BuildPlugin(pluginsPath string, basePath string, abilityPath string) error {
-	archivist.Info("++ Plugin: " + abilityPath)
-	archivist.Info("#go build -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
+	archivist.Debug("#go build -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
 	_, err := custExec("go build -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
 	if nil != err {
 		archivist.Error("- Error building plugin '" + abilityPath + "' - Error: " + err.Error())
