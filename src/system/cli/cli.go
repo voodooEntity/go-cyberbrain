@@ -2,8 +2,9 @@ package cli
 
 import (
 	"flag"
-	"github.com/voodooEntity/archivist"
 	"os"
+
+	"github.com/voodooEntity/archivist"
 )
 
 type Args struct {
@@ -16,6 +17,7 @@ type Args struct {
 var Data Args
 
 func ParseArgs() {
+	//os.Args = []string{"cyberbrain", "run"} ### debug shit
 	if 2 > len(os.Args) {
 		PrintHelpText()
 	}

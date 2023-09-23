@@ -74,7 +74,7 @@ func rBuildInputData(
 	parentId int,
 	nextEntity *transport.TransportEntity,
 ) (transport.TransportEntity, error) {
-	archivist.Debug("buildingput step ", requirement, pool, lookupPointer, lookupIndex, inPool, parentType, parentId, nextEntity)
+	archivist.Debug("buildinput step ", requirement, pool, lookupPointer, lookupIndex, inPool, parentType, parentId, nextEntity)
 	var ret transport.TransportEntity
 	if inPool {
 		archivist.Debug("buildInput inPool")

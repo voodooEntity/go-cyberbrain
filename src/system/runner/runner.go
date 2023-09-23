@@ -65,7 +65,8 @@ func (self *Runner) Loop() {
 				self.FinishJobSuccess(results)
 			}
 		} else {
-			time.Sleep(1000000000)
+			//			time.Sleep(1000000000)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 	archivist.Info("Bezel has been shutdown, runner exiting")
@@ -74,7 +75,7 @@ func (self *Runner) Loop() {
 func (self *Runner) FindJob() bool {
 	// query can be optimized by joining ###todo
 	jobList := job.GetOpenJobs()
-
+	archivist.Debug("Open Jobs found", jobList)
 	// if there are any jobs
 	if 0 < jobList.Amount {
 		// iterate through them
@@ -122,7 +123,7 @@ func (self *Runner) ExecuteJob() ([]transport.TransportEntity, error) {
 		return []transport.TransportEntity{}, errors.New("Job: " + ret.Entities[0].Children()[0].Value + " execution failed with error " + err.Error())
 	}
 	archivist.Info("Job: " + ret.Entities[0].Children()[0].Value + " finished successfully")
-	archivist.Debug("Job result", results)
+	//archivist.Debug("Job result", results)
 	return results, nil
 }
 

@@ -51,7 +51,7 @@ func (self Registry) registerModule(plug string, instance interfaces.PluginInter
 	mapper.MapTransportDataWithContext(instance.GetConfig(), "System")
 
 	// remove the.so from plug string
-	name := strings.TrimRight(plug, ".so")
+	name := strings.TrimSuffix(plug, ".so")
 
 	// Get the mapped categories
 	catQry := query.New().Read("Action").Match("Value", "==", name).To(query.New().Read("Category").TraverseOut(10))

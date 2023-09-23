@@ -2,6 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/gitsapi"
@@ -11,10 +16,6 @@ import (
 	"github.com/voodooEntity/go-cyberbrain/src/system/core"
 	"github.com/voodooEntity/go-cyberbrain/src/system/pluginBuilder"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
-	"io/ioutil"
-	"os"
-	"strings"
-	"time"
 )
 
 const version = "v0.1.0"
@@ -108,7 +109,7 @@ func testPlugins(projectPath string, filter string) {
 		if !strings.Contains(fileName, filter) {
 			continue
 		}
-		pluginName := strings.TrimRight(fileName, ".so")
+		pluginName := strings.TrimSuffix(fileName, ".so")
 		pluginPath := projectPath + "src/" + pluginName + "/"
 		if _, err := os.Stat(pluginPath + "test.json"); os.IsNotExist(err) {
 			archivist.Warning("No test.json found in plugin directory '" + pluginPath + "' skipping the plugin '" + pluginName + "'")
