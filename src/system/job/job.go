@@ -28,10 +28,12 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 	}
 	inputProperties["Data"] = string(inputJson)
 
+	// refer to existing state:open instead of mapping like this since we use parent as related check and
+	// parent is new created
 	mapped := mapper.MapTransportDataWithContextForceCreate(transport.TransportEntity{
 		ID:         -1,
 		Type:       "Job",
-		Context:    "Bezel",
+		Context:    "system",
 		Value:      util.UniqueID(),
 		Properties: jobProperties,
 		ChildRelations: []transport.TransportRelation{

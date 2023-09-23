@@ -40,6 +40,7 @@ func Init(configs map[string]string) {
 
 func startRunners() {
 	cpuAmount := runtime.NumCPU()
+	//cpuAmount = 1
 	for i := 0; i < cpuAmount; i++ {
 		instance := runner.New(i, registry.Data)
 		go instance.Loop()
