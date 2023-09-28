@@ -17,7 +17,7 @@ type Args struct {
 var Data Args
 
 func ParseArgs() {
-	//os.Args = []string{"cyberbrain", "run"} ### debug shit
+	//os.Args = []string{"cyberbrain", "run"} //### debug shit
 	if 2 > len(os.Args) {
 		PrintHelpText()
 	}

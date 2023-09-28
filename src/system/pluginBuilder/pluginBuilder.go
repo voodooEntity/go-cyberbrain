@@ -41,6 +41,7 @@ func BuildPlugins(pluginsPath string, abilitiesPath string, filter string) {
 
 func BuildPlugin(pluginsPath string, basePath string, abilityPath string) error {
 	archivist.Debug("#go build -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
+	//_, err := custExec("go build -gcflags \"all=-N -l\" -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
 	_, err := custExec("go build -buildmode plugin -o " + pluginsPath + abilityPath + ".so " + basePath + abilityPath + "/" + abilityPath + ".go")
 	if nil != err {
 		archivist.Error("- Error building plugin '" + abilityPath + "' - Error: " + err.Error())
