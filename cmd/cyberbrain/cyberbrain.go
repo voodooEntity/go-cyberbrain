@@ -85,6 +85,7 @@ func run() {
 
 	// start the actual gitsapi
 	gitsapi.Start()
+
 }
 
 func buildPlugins(projectPath string, filter string) {

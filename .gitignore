@@ -2,3 +2,4 @@
 *.so
 cmd/cli/*
 cmd/cyberbrain/cyberbrain
+cmd/cyberbrain/plugins/

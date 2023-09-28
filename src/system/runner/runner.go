@@ -68,6 +68,7 @@ func (self *Runner) Loop() {
 			//			time.Sleep(1000000000)
 			time.Sleep(100 * time.Millisecond)
 		}
+		//time.Sleep(time.Second * 4)
 	}
 	archivist.Info("Bezel has been shutdown, runner exiting")
 }

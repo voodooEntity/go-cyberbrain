@@ -46,17 +46,23 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 					Properties: inputProperties,
 				},
 			},
-			{
-				Target: transport.TransportEntity{
-					Type:       "State",
-					Value:      "Open",
-					Context:    "Bezel",
-					ID:         0,
-					Properties: make(map[string]string),
-				},
-			},
 		},
 	}, "System")
+
+	openState := mapper.MapTransportData(transport.TransportEntity{
+		Type:       "State",
+		Value:      "Open",
+		Context:    "System",
+		ID:         0,
+		Properties: make(map[string]string),
+	})
+
+	linkQuery := query.New().Link("Job").Match("ID", "==", strconv.Itoa(mapped.ID)).To(
+		query.New().Find("State").Match("ID", "==", strconv.Itoa(openState.ID)),
+	)
+
+	query.Execute(linkQuery)
+
 	archivist.Debug("Mapped new job", mapped)
 	return &Job{}
 }
@@ -116,6 +122,7 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 			}
 			// detach open state from job
 			gits.DeleteRelationUnsafe(e.Type, e.ID, stateTypeID, openState.ID)
+			//gits.DeleteEntityUnsafe(openState.Type, openState.ID)
 			// get assigned state entity
 			assignedState, _ := gits.GetEntitiesByTypeAndValueUnsafe("State", "Assigned", "match", "System")
 			archivist.Debug("assigned state entity", assignedState)
