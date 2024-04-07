@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bufio"
 	"flag"
+	"io"
 	"os"
 
 	"github.com/voodooEntity/archivist"
@@ -11,6 +13,7 @@ type Args struct {
 	ProjectPath string
 	Filter      string
 	Command     string
+	Stdin       string
 	Verbose     bool
 }
 
@@ -51,11 +54,14 @@ func ParseArgs() {
 
 	flag.Parse()
 
+	stdIn := getPipedInput()
+
 	Data = Args{
 		ProjectPath: projectPath,
 		Filter:      filter,
 		Verbose:     verboseFlag,
 		Command:     command,
+		Stdin:       stdIn,
 	}
 }
 
@@ -93,4 +99,19 @@ func PrintHelpText() {
 		"    --verbose                     | Activates verbose output mode\n"
 	archivist.Info(helpText)
 	os.Exit(1)
+}
+
+func getPipedInput() string {
+	reader := bufio.NewReader(os.Stdin)
+	var output []rune
+
+	for {
+		input, _, err := reader.ReadRune()
+		if err != nil && err == io.EOF {
+			break
+		}
+		output = append(output, input)
+	}
+
+	return string(output)
 }
