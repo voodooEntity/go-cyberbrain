@@ -103,12 +103,19 @@ func PrintHelpText() {
 
 func getPipedInput() string {
 	reader := bufio.NewReader(os.Stdin)
-	var output []rune
+	if reader.Buffered() == 0 {
+		return ""
+	}
 
+	var output []rune
 	for {
 		input, _, err := reader.ReadRune()
-		if err != nil && err == io.EOF {
-			break
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				return ""
+			}
 		}
 		output = append(output, input)
 	}
