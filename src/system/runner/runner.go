@@ -211,6 +211,8 @@ func (self *Runner) FinishJobSuccess(results []transport.TransportEntity) {
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
 	query.Execute(qry)
+
+	deleteJobAndInput(jobId)
 }
 
 func (self *Runner) FinishJobError(err error) {
@@ -228,6 +230,27 @@ func (self *Runner) FinishJobError(err error) {
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
 	query.Execute(qry)
+
+	deleteJobAndInput(jobId)
+}
+
+func deleteJobAndInput(jobID int) {
+	jobQry := query.New().Read("Job").Match("ID", "==", strconv.Itoa(jobID)).To(
+		query.New().Read("Input"),
+	)
+	dat := query.Execute(jobQry)
+
+	unlinkQuery := query.New().Unlink("Job").Match("Value", "==", strconv.Itoa(dat.Entities[0].ID)).To(
+		query.New().Find("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID)),
+	)
+	query.Execute(unlinkQuery)
+
+	jobDeleteQry := query.New().Delete("Job").Match("ID", "==", strconv.Itoa(dat.Entities[0].ID))
+	query.Execute(jobDeleteQry)
+
+	inputDeleteQuery := query.New().Delete("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID))
+	query.Execute(inputDeleteQuery)
+
 }
 
 func rRemovebMap(entity transport.TransportEntity) {
