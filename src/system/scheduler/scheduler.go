@@ -55,7 +55,9 @@ func createNewJobs(entity transport.TransportEntity, registry registry.Registry)
 		inputData, err := rBuildInputData(requirement.Children()[0], entity, pointer, lookup, false, "", -1, nil)
 		// if we got no err the inputData should be complete to create a new job
 		if nil != err {
-			archivist.Error(err.Error(), requirement.Children()[0], entity)
+			// ### must review, is this an actual error case? i think this only occurs on dependencies which could not get fully satisfied which
+			// us a legitimate case to happen (we check the data for types but not structure) !important ###
+			archivist.Debug(err.Error(), requirement.Children()[0], entity)
 		} else {
 			archivist.Debug("Created a new job with payload", inputData)
 			job.Create(act.GetName(), actionAndDependency[1], inputData)

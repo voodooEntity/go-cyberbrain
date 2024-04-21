@@ -11,6 +11,8 @@ import (
 	"runtime"
 )
 
+var Runners []int
+
 func Init(configs map[string]string) {
 	// init the gits storage
 	gits.Init(types.PersistenceConfig{
@@ -22,7 +24,7 @@ func Init(configs map[string]string) {
 	// then we populate the action registry
 	registry.Data = registry.New().Index()
 
-	// we gonne find a better place for this
+	// we gonne find a better place for this ###
 	createNecessaryEntities()
 
 	// bring it to life
@@ -44,6 +46,7 @@ func startRunners() {
 	for i := 0; i < cpuAmount; i++ {
 		instance := runner.New(i, registry.Data)
 		go instance.Loop()
+		Runners = append(Runners, i)
 	}
 }
 
@@ -83,5 +86,4 @@ func createNecessaryEntities() {
 		Context:    "System",
 		Properties: make(map[string]string),
 	})
-
 }

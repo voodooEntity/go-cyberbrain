@@ -70,7 +70,8 @@ func (self *Runner) Loop() {
 		}
 		//time.Sleep(time.Second * 4)
 	}
-	archivist.Info("Bezel has been shutdown, runner exiting")
+	self.ChangeState("Dead")
+	archivist.Info("Cyberbrain has been shutdown, runner exiting")
 }
 
 func (self *Runner) FindJob() bool {
@@ -213,6 +214,7 @@ func (self *Runner) FinishJobSuccess(results []transport.TransportEntity) {
 	query.Execute(qry)
 
 	deleteJobAndInput(jobId)
+	self.ChangeState("Searching")
 }
 
 func (self *Runner) FinishJobError(err error) {
@@ -232,6 +234,7 @@ func (self *Runner) FinishJobError(err error) {
 	query.Execute(qry)
 
 	deleteJobAndInput(jobId)
+	self.ChangeState("Searching")
 }
 
 func deleteJobAndInput(jobID int) {

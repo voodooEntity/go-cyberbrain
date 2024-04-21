@@ -3,11 +3,12 @@ package cli
 import (
 	"bufio"
 	"flag"
-	"io"
-	"os"
-
 	"github.com/voodooEntity/archivist"
+	"os"
 )
+
+const RUN_MODE_CONTINOUUS = 1
+const RUN_MODE_ONESHOT = 2
 
 type Args struct {
 	ProjectPath string
@@ -15,6 +16,7 @@ type Args struct {
 	Command     string
 	Stdin       string
 	Verbose     bool
+	Mode        int
 }
 
 var Data Args
@@ -52,9 +54,18 @@ func ParseArgs() {
 	var verboseFlag bool
 	flag.BoolVar(&verboseFlag, "verbose", false, "Verbose logging flag")
 
+	// oneshot flag - maybe change this to a "mode" later
+	var oneshot bool
+	flag.BoolVar(&oneshot, "oneshot", false, "Oneshot execution mode shorthand flag")
+
 	flag.Parse()
 
-	stdIn := getPipedInput()
+	mode := RUN_MODE_CONTINOUUS
+	if oneshot {
+		mode = RUN_MODE_ONESHOT
+	}
+
+	stdIn, _ := getStdinContent()
 
 	Data = Args{
 		ProjectPath: projectPath,
@@ -62,7 +73,9 @@ func ParseArgs() {
 		Verbose:     verboseFlag,
 		Command:     command,
 		Stdin:       stdIn,
+		Mode:        mode,
 	}
+	archivist.Info("CliData", Data)
 }
 
 func PrintHelpText() {
@@ -101,24 +114,30 @@ func PrintHelpText() {
 	os.Exit(1)
 }
 
-func getPipedInput() string {
+func getStdinContent() (string, error) {
+	// Check if data is available on stdin without blocking
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	if info.Mode()&os.ModeNamedPipe == 0 {
+		// No data available on stdin
+		return "", nil
+	}
+
+	// Data is available on stdin, start reading
 	reader := bufio.NewReader(os.Stdin)
-	if reader.Buffered() == 0 {
-		return ""
+	content, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
 	}
 
-	var output []rune
-	for {
-		input, _, err := reader.ReadRune()
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				return ""
-			}
-		}
-		output = append(output, input)
+	// Check if content ends with a newline character
+	if len(content) > 0 && content[len(content)-1] == '\n' {
+		// Remove the trailing newline character
+		content = content[:len(content)-1]
 	}
 
-	return string(output)
+	return content, nil
 }

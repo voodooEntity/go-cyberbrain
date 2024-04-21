@@ -6,6 +6,8 @@ github.com/voodooEntity/gits v0.0.20 h1:nIvYsFtRgXFP64wcPOiW7Wy3BXVTzjr5Iu+gW6NI
 github.com/voodooEntity/gits v0.0.20/go.mod h1:8spOvNEi3UeUTqbRtZZaYmUUVMBmvrR/k6LMOIkbXkc=
 github.com/voodooEntity/gits v0.0.21 h1:ryhVu+V2xDAh7FBLgQm7riajAJ/NWb17BbQbE6Kaq6s=
 github.com/voodooEntity/gits v0.0.21/go.mod h1:8spOvNEi3UeUTqbRtZZaYmUUVMBmvrR/k6LMOIkbXkc=
+github.com/voodooEntity/gits v0.0.22 h1:91qeSJwlDjch0o8mmL0LF0jP9zgYhXhYl9rSA90VHyg=
+github.com/voodooEntity/gits v0.0.22/go.mod h1:8spOvNEi3UeUTqbRtZZaYmUUVMBmvrR/k6LMOIkbXkc=
 github.com/voodooEntity/gitsapi v0.0.17 h1:RVjw6aWkBEw75aFqEi5N2WooXstj0piaV/jx5eOLwV0=
 github.com/voodooEntity/gitsapi v0.0.17/go.mod h1:zljkzRReB5bSa279TxcQpfdUXAN33B4vNp/VnM3LrNc=
 github.com/voodooEntity/gitsapi v0.0.18 h1:4tC4Abn5JJ8OXMjKP0JF4iwSbXQcaLtLFqv3HC5pt9o=

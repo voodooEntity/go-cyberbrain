@@ -62,6 +62,22 @@ func IsActive() bool {
 	return false
 }
 
+func Shutdown() bool {
+	qry := query.New().Update("AI").Match(
+		"Value",
+		"==",
+		"Bezel",
+	).Set(
+		"Properties.State",
+		"Dead",
+	)
+	ret := query.Execute(qry)
+	if 0 < ret.Amount {
+		return true
+	}
+	return false
+}
+
 func DirectoryWalkMatch(root, pattern string) ([]string, error) {
 	var matches []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {

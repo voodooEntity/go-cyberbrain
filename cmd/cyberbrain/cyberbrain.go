@@ -2,6 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
+	"github.com/voodooEntity/go-cyberbrain/src/system/observer"
+	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
+	"github.com/voodooEntity/go-cyberbrain/src/system/scheduler"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -52,7 +56,7 @@ func run() {
 
 	// init gitsapi the config
 	// temporaray hardcoded configs here
-	gitsApiCfg := map[string]string{
+	gitsCfg := map[string]string{
 		"HOST":           "127.0.0.1",
 		"PORT":           "1984",
 		"PERSISTENCE":    "active",
@@ -68,6 +72,47 @@ func run() {
 		"PROTOCOL":       "http",
 	}
 	if cli.Data.Verbose {
+		gitsCfg["LOG_LEVEL"] = "debug"
+	}
+
+	// than we init the core
+	core.Init(gitsapiConfig.Data)
+
+	switch mode := cli.Data.Mode; mode {
+	case cli.RUN_MODE_CONTINOUUS:
+		startContinouus(gitsCfg)
+	case cli.RUN_MODE_ONESHOT:
+		startOneshot()
+	}
+
+}
+
+func startOneshot() {
+	if "" == cli.Data.Stdin {
+		archivist.Error("Missing stdin content for oneshot execution")
+		return
+	}
+
+	// unpack the json
+	var transportData transport.TransportEntity
+	if err := json.Unmarshal([]byte(cli.Data.Stdin), &transportData); err != nil {
+		archivist.Error("Invalid json input", err.Error())
+		return
+	}
+
+	// lets pass the body to our mapper
+	// that will recursive map the entities
+	mappedData := mapper.MapTransportDataWithContext(transportData, "Data")
+	rootType := mappedData.Type
+	rootID := mappedData.ID
+	scheduler.Run(mappedData, registry.Data)
+
+	obs := observer.New(rootType, rootID)
+	obs.Loop()
+}
+
+func startContinouus(gitsApiCfg map[string]string) {
+	if cli.Data.Verbose {
 		gitsApiCfg["LOG_LEVEL"] = "debug"
 	}
 
@@ -80,12 +125,8 @@ func run() {
 	// initing some additional application specific endpoints
 	api.Extend()
 
-	// than we init the core
-	core.Init(gitsapiConfig.Data)
-
 	// start the actual gitsapi
 	gitsapi.Start()
-
 }
 
 func buildPlugins(projectPath string, filter string) {
