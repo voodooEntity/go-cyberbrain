@@ -5,6 +5,7 @@ import (
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/go-cyberbrain/src/system/core"
+	"github.com/voodooEntity/go-cyberbrain/src/system/job"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 	"strconv"
 	"time"
@@ -14,14 +15,31 @@ type Observer struct {
 	RootType          string
 	RootID            int
 	InactiveIncrement int
+	Runners           []Tracker
+}
+
+type Tracker struct {
+	ID      int
+	Version int
 }
 
 func New(rootType string, rootID int) *Observer {
 	archivist.Info("Creating observer")
+	var runners []Tracker
+	qry := query.New().Read("Runner")
+	res := query.Execute(qry)
+	for _, val := range res.Entities {
+		runners = append(runners, Tracker{
+			ID:      val.ID,
+			Version: val.Version,
+		})
+	}
+
 	return &Observer{
 		RootType:          rootType,
 		RootID:            rootID,
 		InactiveIncrement: 0,
+		Runners:           runners,
 	}
 }
 
@@ -36,11 +54,26 @@ func (self *Observer) Loop() {
 
 func (self *Observer) ReachedEndgame() bool {
 	runnerQry := query.New().Read("Runner").Match("Properties.State", "==", "Searching")
-	runners := query.Execute(runnerQry)
-	archivist.Debug("Observer: searching runners", runners.Amount)
+	sysRunners := query.Execute(runnerQry)
+	archivist.Debug("Observer: searching runners", sysRunners.Amount)
 	archivist.Debug("Observer: total amount created runners", len(core.Runners))
-	if runners.Amount == len(core.Runners) {
-		archivist.Debug("Observer: current inactiveIncrement", self.InactiveIncrement)
+	openJobs := job.GetOpenJobs()
+	if openJobs.Amount == 0 && sysRunners.Amount == len(core.Runners) {
+		changedVersion := false
+		for _, sysRunner := range sysRunners.Entities {
+			for tid, tracker := range self.Runners {
+				if sysRunner.ID == tracker.ID {
+					if sysRunner.Version != tracker.Version {
+						changedVersion = true
+						self.Runners[tid].Version = sysRunner.Version
+					}
+				}
+			}
+		}
+		if changedVersion {
+			self.InactiveIncrement = 0
+			return false
+		}
 		if self.InactiveIncrement > 5 {
 			return true
 		}
