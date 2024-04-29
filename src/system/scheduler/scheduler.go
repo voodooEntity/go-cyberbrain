@@ -48,7 +48,7 @@ func createNewJobs(entity transport.TransportEntity, registry registry.Registry)
 	// the data that is in our storage ### should be revisited , the way this is going to be implemented
 	// could possibly satisfy multiple dependency structures of the same action at once. im not sure
 	// if that is actually something we want but its easy to purge later on and for now I'm going to do it
-	// this way.
+	// this way.ccc
 	for _, actionAndDependency := range actionsAndDependencies {
 		act, _ := registry.GetAction(actionAndDependency[0])
 		requirement := act.GetDependencyByName(actionAndDependency[1])
@@ -282,7 +282,40 @@ func applyMatchingFilter(entity transport.TransportEntity, requirement transport
 	if "Set" == filterType {
 		return true
 	} else if "Match" == filterType {
-		return matchFields(requirement.Properties["FilterValue"], requirement.Properties["FilterOperator"], entity.Value)
+		filters := make(map[string][]string)
+		for name, val := range requirement.Properties {
+			if len(name) > 6 && name[:6] == "Filter" {
+				splitName := strings.Split(name, ".")
+				// invalid structure
+				if len(splitName) != 3 {
+					return false
+				}
+				key := splitName[1]
+				typ := splitName[2]
+				if _, ok := filters[key]; !ok {
+					filters[key] = []string{"", "", ""}
+				}
+				switch typ {
+				case "Field":
+					filters[key][0] = val
+				case "Operator":
+					filters[key][1] = val
+				case "Value":
+					filters[key][2] = val
+				}
+			}
+		}
+		for _, val := range filters {
+			archivist.Debug("MatchField: " + val[0])
+			archivist.Debug("MatchValue: " + util.ResolveEntityField(entity, val[0]))
+			archivist.Debug("MatchOperator: " + val[1])
+			archivist.Debug("MatchTarget: " + val[2])
+			archivist.Debug("MatchResult: ", matchFields(val[2], val[1], util.ResolveEntityField(entity, val[0])))
+			if !matchFields(val[2], val[1], util.ResolveEntityField(entity, val[0])) {
+				return false
+			}
+		}
+		return true
 	}
 	archivist.Debug("No known matching type given in dependency, prolly a plugin bug", requirement)
 	return false
@@ -290,6 +323,10 @@ func applyMatchingFilter(entity transport.TransportEntity, requirement transport
 
 func matchFields(alpha string, operator string, beta string) bool {
 	switch operator {
+	case "!=":
+		if alpha != beta {
+			return true
+		}
 	case "==":
 		if alpha == beta {
 			return true
@@ -409,7 +446,7 @@ func rEnrichLookupAndPointer(entity transport.TransportEntity, lookup map[string
 	for _, childRelation := range entity.ChildRelations {
 		lookup, pointer = rEnrichLookupAndPointer(childRelation.Target, lookup, pointer)
 	}
-	//for _, parentRelation := range entity.ParentRelations {
+	//for _, parentRelation := range entity.ParentRelations { // ### enrichment towards parents is disabled for now
 	//	lookup, pointer = rEnrichLookupAndPointer(parentRelation.Target, lookup, pointer)
 	//}
 	return lookup, pointer

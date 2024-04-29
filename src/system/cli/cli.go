@@ -75,7 +75,6 @@ func ParseArgs() {
 		Stdin:       stdIn,
 		Mode:        mode,
 	}
-	archivist.Info("CliData", Data)
 }
 
 func PrintHelpText() {

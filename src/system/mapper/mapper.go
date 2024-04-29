@@ -120,6 +120,24 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		createEntity = true
 		// ##### mapID, _ = gits.CreateEntityUnsafe(newEntity)
 		entity.Properties["bMap"] = ""
+	} else if -2 == entity.ID {
+		tmp, _ := gits.GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
+		if 0 < len(tmp) {
+			mapID = tmp[0].ID
+		} else {
+			// now we create the fitting entity
+			newEntity = types.StorageEntity{
+				ID:         -1,
+				Type:       TypeID,
+				Value:      entity.Value,
+				Context:    entity.Context,
+				Version:    1,
+				Properties: util.CopyStringStringMap(entity.Properties),
+			}
+			// now we create the entity
+			createEntity = true
+			entity.Properties["bMap"] = ""
+		}
 	} else if 0 == entity.ID {
 		// checking if a source related entity exists with the same value, if yes map onto it, if not create it.
 		// this could be extended by using structural uniqueness defintions of we see those are neccesary

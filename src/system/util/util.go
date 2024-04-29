@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/query"
+	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain-plugin-interface/src/interfaces"
 	"os"
 	"path/filepath"
@@ -130,4 +131,20 @@ func CopyStringStringMap(data map[string]string) map[string]string {
 		ret[k] = v
 	}
 	return ret
+}
+
+func ResolveEntityField(entity transport.TransportEntity, field string) string {
+	switch field {
+	case "Value":
+		return entity.Value
+	case "Context":
+		return entity.Context
+	default:
+		if len(field) > 11 && field[:11] == "Properties." {
+			if val, ok := entity.Properties[field[11:]]; ok {
+				return val
+			}
+		}
+	}
+	return ""
 }
