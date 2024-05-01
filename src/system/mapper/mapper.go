@@ -21,7 +21,7 @@ func MapTransportData(data transport.TransportEntity) transport.TransportEntity 
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportData ", data)
-	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, "", false)
+	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, "", false, nil)
 
 	// now we unlock all the mutexes again
 	gits.RelationStorageMutex.Unlock()
@@ -39,7 +39,7 @@ func MapTransportDataWithContext(data transport.TransportEntity, context string)
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataWithContext ", data)
-	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, context, false)
+	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, context, false, nil)
 
 	// now we unlock all the mutexes again
 	gits.RelationStorageMutex.Unlock()
@@ -57,7 +57,7 @@ func MapTransportDataWithContextForceCreate(data transport.TransportEntity, cont
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataWithContextForceCreate ", data)
-	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, context, true)
+	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, context, true, nil)
 
 	// now we unlock all the mutexes again
 	gits.RelationStorageMutex.Unlock()
@@ -75,7 +75,7 @@ func MapTransportDataForceCreate(data transport.TransportEntity) transport.Trans
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataForceCreate ", data)
-	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, "", true)
+	ret := mapRecursive(data, -1, -1, gits.DIRECTION_NONE, "", true, nil)
 
 	// now we unlock all the mutexes again
 
@@ -86,7 +86,13 @@ func MapTransportDataForceCreate(data transport.TransportEntity) transport.Trans
 	return ret
 }
 
-func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID int, direction int, overwriteContext string, forceCreate bool) transport.TransportEntity {
+type RecursiveMapCtx struct {
+	SourceEntity   *transport.TransportEntity
+	SourceRelation *transport.TransportRelation
+	Direction      int
+}
+
+func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID int, direction int, overwriteContext string, forceCreate bool, ctx *RecursiveMapCtx) transport.TransportEntity {
 	// first we get the right TypeID
 	var TypeID int
 	var err error
@@ -188,7 +194,11 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		for key, childRelation := range entity.ChildRelations {
 			// pas the child entity and the parent coords to
 			// create the relation after inserting the entity
-			entity.ChildRelations[key].Target = mapRecursive(childRelation.Target, TypeID, mapID, gits.DIRECTION_CHILD, overwriteContext, forceCreate)
+			entity.ChildRelations[key].Target = mapRecursive(childRelation.Target, TypeID, mapID, gits.DIRECTION_CHILD, overwriteContext, forceCreate, &RecursiveMapCtx{
+				SourceEntity:   &entity,
+				SourceRelation: &entity.ChildRelations[key],
+				Direction:      gits.DIRECTION_CHILD,
+			})
 		}
 	}
 	// than map the parent elements
@@ -198,12 +208,17 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		for key, parentRelation := range entity.ParentRelations {
 			// pas the child entity and the parent coords to
 			// create the relation after inserting the entity
-			entity.ParentRelations[key].Target = mapRecursive(parentRelation.Target, TypeID, mapID, gits.DIRECTION_PARENT, overwriteContext, forceCreate)
+			entity.ParentRelations[key].Target = mapRecursive(parentRelation.Target, TypeID, mapID, gits.DIRECTION_PARENT, overwriteContext, forceCreate, &RecursiveMapCtx{
+				SourceEntity:   &entity,
+				SourceRelation: &entity.ParentRelations[key],
+				Direction:      gits.DIRECTION_PARENT,
+			})
 		}
 	}
 	// now lets check if our parent Type and id
 	// are not -1 , if so we need to create
 	// a relation
+	createdRelation := false
 	if relatedType != -1 && relatedID != -1 {
 		// lets create the relation to our parent
 		if gits.DIRECTION_CHILD == direction {
@@ -217,6 +232,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 					Version:    1,
 				}
 				gits.CreateRelationUnsafe(relatedType, relatedID, TypeID, mapID, tmpRelation)
+				createdRelation = true
 			}
 		} else if gits.DIRECTION_PARENT == direction {
 			// first we make sure the relation doesnt already exist (because we allow mapped existing data inside a to map json)
@@ -230,7 +246,17 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 					Version:    1,
 				}
 				gits.CreateRelationUnsafe(TypeID, mapID, relatedType, relatedID, tmpRelation)
+				createdRelation = true
 			}
+		}
+	}
+
+	// if we created a relation we gonne mark the relation with bmap so we can identify it late ron in the scheduler in terms of structural mapping
+	if createdRelation {
+		// add  only add such structures that should trigger a follow up job. but marking all new entities would be more correct
+		if _, ok := ctx.SourceEntity.Properties["bMap"]; !ok && !createEntity {
+			ctx.SourceRelation.Properties = map[string]string{"bMap": ""}
+			archivist.Info("Created relation from " + ctx.SourceEntity.Type + " to " + entity.Type + " without surrounding new entities")
 		}
 	}
 	// only the first return is interesting since it

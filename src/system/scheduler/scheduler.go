@@ -19,13 +19,37 @@ func Run(data transport.TransportEntity, registry registry.Registry) {
 	demultiplexedData := demultiplexer.Parse(data)
 	archivist.Debug("Demultiplexed input", demultiplexedData)
 
+	var newRelationStructures []string
+	newRelationStructures = rFilterRelationStructures(data, newRelationStructures)
+
 	// build job inputs by each singleEntry of demultiplexed data
 	for _, singleData := range demultiplexedData {
-		createNewJobs(singleData, registry)
+		createNewJobs(singleData, newRelationStructures, registry)
 	}
 }
 
-func createNewJobs(entity transport.TransportEntity, registry registry.Registry) []transport.TransportEntity {
+func rFilterRelationStructures(entity transport.TransportEntity, relationStructures []string) []string {
+	if 0 < len(entity.ChildRelations) {
+		for _, childRelation := range entity.ChildRelations {
+			if _, ok := childRelation.Properties["bMap"]; ok {
+				tmpRelString := entity.Type + "-" + childRelation.Target.Type
+				add := true
+				for _, knownRelString := range relationStructures {
+					if knownRelString == tmpRelString {
+						add = false
+					}
+				}
+				if add {
+					relationStructures = append(relationStructures, tmpRelString)
+				}
+			}
+			relationStructures = rFilterRelationStructures(childRelation.Target, relationStructures)
+		}
+	}
+	return relationStructures
+}
+
+func createNewJobs(entity transport.TransportEntity, newRelationStructures []string, registry registry.Registry) []transport.TransportEntity {
 	// first we will enrich some lookup variables we need later on
 	// by recursively walking the given data
 	lookup := make(map[string]int)
@@ -42,6 +66,14 @@ func createNewJobs(entity transport.TransportEntity, registry registry.Registry)
 	}
 	archivist.Debug("Action and dependency found to input", actionsAndDependencies)
 
+	// now also gonne lookup & enrich the actionsAndDependencies based on the newRelationStructures
+	if 0 < len(newRelationStructures) {
+		archivist.Info("New relevant relation structures found in scheduler %+v", newRelationStructures)
+		archivist.Info("actionsAndDependencies before enrichin by relation structures", actionsAndDependencies)
+		actionsAndDependencies = enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures, actionsAndDependencies)
+		archivist.Info("actionsAndDependencies after enrichin by relation structures", actionsAndDependencies)
+	}
+
 	// at this point we go a single possible input structure and all potential actions/dependencies
 	// that could be satisfied using it. Now we're going to try build actual input data by walking
 	// through the dependencies and enrich an input datastructure using the given entity data and
@@ -53,10 +85,11 @@ func createNewJobs(entity transport.TransportEntity, registry registry.Registry)
 		act, _ := registry.GetAction(actionAndDependency[0])
 		requirement := act.GetDependencyByName(actionAndDependency[1])
 		inputData, err := rBuildInputData(requirement.Children()[0], entity, pointer, lookup, false, "", -1, nil)
+		archivist.Debug("Trying to enrich data based on ", actionAndDependency)
 		// if we got no err the inputData should be complete to create a new job
 		if nil != err {
 			// ### must review, is this an actual error case? i think this only occurs on dependencies which could not get fully satisfied which
-			// us a legitimate case to happen (we check the data for types but not structure) !important ###
+			// is a legitimate case to happen (we check the data for types but not structure) !important ###
 			archivist.Debug(err.Error(), requirement.Children()[0], entity)
 		} else {
 			archivist.Debug("Created a new job with payload", inputData)
@@ -64,6 +97,25 @@ func createNewJobs(entity transport.TransportEntity, registry registry.Registry)
 		}
 	}
 	return []transport.TransportEntity{}
+}
+
+func enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures []string, actionsAndDependencies [][2]string) [][2]string {
+	for _, relationStructure := range newRelationStructures {
+		actions := retrieveActionsByRelationStructure(relationStructure)
+		archivist.Info("Retrieved actions by relationStructure "+relationStructure, actions)
+		for _, action := range actions {
+			add := true
+			for _, val := range actionsAndDependencies {
+				if val[0] == action[0] && val[1] == action[1] {
+					add = false
+				}
+			}
+			if add {
+				actionsAndDependencies = append(actionsAndDependencies, action)
+			}
+		}
+	}
+	return actionsAndDependencies
 }
 
 func rBuildInputData(
@@ -407,16 +459,35 @@ func matchFields(alpha string, operator string, beta string) bool {
 
 func retrieveActionsByType(entityType string) [][2]string {
 	var ret [][2]string
-	qry := query.New().Read("DependencyLookup").Match("Value", "==", entityType).To(
+	qry := query.New().Read("DependencyEntityLookup").Match("Value", "==", entityType).To(
 		query.New().Read("Dependency").From(
 			query.New().Read("Action"),
 		),
 	)
 	result := query.Execute(qry)
-	archivist.Debug("DependencyLookup ", entityType, result)
+	archivist.Debug("DependencyEntityLookup ", entityType, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {
-			for _, actionEntity := range dependencyEntity.Parents() {
+			for _, actionEntity := range dependencyEntity.Parents() { // ### todo : this is a very wierd behaviour, it works for us here but one would expect to also find the DependencyEntityLookup when checking the parents. but due to the way we build the return json tree its not
+				ret = append(ret, [2]string{actionEntity.Value, dependencyEntity.Value})
+			}
+		}
+	}
+	return ret
+}
+
+func retrieveActionsByRelationStructure(relationStructure string) [][2]string {
+	var ret [][2]string
+	qry := query.New().Read("DependencyRelationLookup").Match("Value", "==", relationStructure).To(
+		query.New().Read("Dependency").From(
+			query.New().Read("Action"),
+		),
+	)
+	result := query.Execute(qry)
+	archivist.Info("DependencyRelationLookup ", relationStructure, result)
+	if 0 < len(result.Entities) {
+		for _, dependencyEntity := range result.Entities[0].Children() {
+			for _, actionEntity := range dependencyEntity.Parents() { // ### todo : this is a very wierd behaviour, it works for us here but one would expect to also find the DependencyEntityLookup when checking the parents. but due to the way we build the return json tree its not
 				ret = append(ret, [2]string{actionEntity.Value, dependencyEntity.Value})
 			}
 		}
