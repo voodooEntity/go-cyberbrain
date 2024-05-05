@@ -256,7 +256,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		// add  only add such structures that should trigger a follow up job. but marking all new entities would be more correct
 		if _, ok := ctx.SourceEntity.Properties["bMap"]; !ok && !createEntity {
 			ctx.SourceRelation.Properties = map[string]string{"bMap": ""}
-			archivist.Info("Created relation from " + ctx.SourceEntity.Type + " to " + entity.Type + " without surrounding new entities")
+			archivist.Debug("Created relation from " + ctx.SourceEntity.Type + " to " + entity.Type + " without surrounding new entities")
 		}
 	}
 	// only the first return is interesting since it

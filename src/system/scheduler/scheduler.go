@@ -115,7 +115,7 @@ func enrichLookupAndPointerByRelationStructures(newRelationStructures map[string
 func enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, actionsAndDependencies [][2]string) [][2]string {
 	for relationStructure, _ := range newRelationStructures {
 		actions := retrieveActionsByRelationStructure(relationStructure)
-		archivist.Info("Retrieved actions by relationStructure "+relationStructure, actions)
+		archivist.Debug("Retrieved actions by relationStructure "+relationStructure, actions)
 		for _, action := range actions {
 			add := true
 			for _, val := range actionsAndDependencies {
@@ -223,7 +223,7 @@ func retrieveActionsByRelationStructure(relationStructure string) [][2]string {
 		),
 	)
 	result := query.Execute(qry)
-	archivist.Info("DependencyRelationLookup ", relationStructure, result)
+	archivist.Debug("DependencyRelationLookup ", relationStructure, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {
 			for _, actionEntity := range dependencyEntity.Parents() { // ### todo : this is a very wierd behaviour, it works for us here but one would expect to also find the DependencyEntityLookup when checking the parents. but due to the way we build the return json tree its not
