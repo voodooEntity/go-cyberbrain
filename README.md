@@ -1,5 +1,5 @@
 # IMPORTANT NOTE
-go-cyberbrain at this moment is in a pre-alpha experimental state. Im right now working on the docs because without them its quite impossible to dive into it. I will add more documentations in the near future, but due to limited time i can spend on this project i can't provide a final date. 
+go-cyberbrain at this moment is in a pre-alpha experimental state. Im right now working on the docs because without them its quite impossible to dive into it. I will add more documentations in the as soon as possible, but due to limited time i can spend on this project i can't provide a final date. 
 
 Im happy if you're interested in the topic and may revisit the project later.
 
@@ -9,7 +9,7 @@ voodooEntity aka laughingman
 
 ## go-cyberbrain
 
-go-cyberbrain is an innovative architectural framework for building intelligent applications. It provides a solid foundation that allows developers to effortlessly construct applications by leveraging custom plugins tailored to their specific requirements.
+go-cyberbrain is an architectural framework for building data driven applications. It provides a solid foundation that allows developers to effortlessly construct applications by creating custom plugins which define the capabilities of the application based on to their specific requirements.
 
 **Note:** go-cyberbrain is currently in the early alpha state and should be considered more experimental than production-ready. While it showcases the idea of the architecture, further development is underway to reach a production-ready state.
 
@@ -17,7 +17,7 @@ go-cyberbrain is an innovative architectural framework for building intelligent 
 
 - Lightweight and optimized: go-cyberbrain is built using mostly standard Go libraries, ensuring a streamlined development experience without the need for third-party dependencies other than created the same developers.
 - Self-supervising and orchestrating: With go-cyberbrain, the architecture takes charge of managing the workload and scheduling, allowing developers to focus on developing plugins and enhancing the application's functionality.
-- Extensibility through plugins: Plugins define the specific requirements and behavior of the application. By developing custom plugins, developers can extend go-cyberbrain's capabilities and tailor the application to their needs.
+- Extensibility through plugins: Plugins define the specific requirements and behavior of the application. By developing custom plugins, developers can define and extend go-cyberbrain's capabilities and tailor the application to their needs.
 - Data-driven processing: go-cyberbrain embraces a data-driven approach, seamlessly handling complex data flows. Its in-memory graph backend facilitates the storage, analysis, and enrichment of interconnected information.
 - Multithreaded by design: go-cyberbrain optimizes job execution by utilizing a multi threaded architecture. It ensures efficient processing, avoids duplication of tasks, and maximizes performance.
 
