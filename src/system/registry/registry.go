@@ -68,7 +68,8 @@ func (self Registry) registerModule(plug string, instance interfaces.PluginInter
 	for _, val := range moduleInstance.GetDependencies() {
 		dependencyTypeList := getDependencyStructureTypes(val)
 		archivist.Debug("Mapping dependency lookup ", dependencyTypeList, val.ID)
-		mapDependencyLookupNodes(dependencyTypeList, val.ID)
+		mapDependencyEntityLookupNodes(dependencyTypeList, val.ID)
+		mapDependencyRelationLookupNodes(val)
 	}
 
 	// finally we place the module instance inside our map
@@ -91,10 +92,53 @@ func (self Registry) GetInstance(name string) (interfaces.PluginInterface, error
 	return nil, errors.New("Action '" + name + "'not found in registry")
 }
 
-func mapDependencyLookupNodes(dependencyTypes []string, dependencyId int) {
+func mapDependencyRelationLookupNodes(entity transport.TransportEntity) {
+	var relationStructures []string
+	relationStructures = rFindRelationStructures(entity, relationStructures)
+	archivist.Info("Relation structures found in registry ", relationStructures)
+	for _, val := range relationStructures {
+		gits.MapTransportData(transport.TransportEntity{
+			Type:       "DependencyRelationLookup",
+			ID:         0,
+			Value:      val,
+			Context:    "System",
+			Properties: make(map[string]string),
+			ChildRelations: []transport.TransportRelation{
+				transport.TransportRelation{
+					Context: "Structure",
+					Target: transport.TransportEntity{
+						Type: "Dependency",
+						ID:   entity.ID,
+					},
+				},
+			},
+		})
+	}
+}
+
+func rFindRelationStructures(entity transport.TransportEntity, relationStructures []string) []string {
+	if 0 < len(entity.ChildRelations) {
+		for _, childRelation := range entity.ChildRelations {
+			tmpRelString := entity.Value + "-" + childRelation.Target.Value
+			add := true
+			for _, knownRelString := range relationStructures {
+				if knownRelString == tmpRelString {
+					add = false
+				}
+			}
+			if add {
+				relationStructures = append(relationStructures, tmpRelString)
+			}
+			relationStructures = rFindRelationStructures(childRelation.Target, relationStructures)
+		}
+	}
+	return relationStructures
+}
+
+func mapDependencyEntityLookupNodes(dependencyTypes []string, dependencyId int) {
 	for _, val := range dependencyTypes {
 		gits.MapTransportData(transport.TransportEntity{
-			Type:       "DependencyLookup",
+			Type:       "DependencyEntityLookup",
 			ID:         0,
 			Value:      val,
 			Context:    "System",
