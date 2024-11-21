@@ -3,6 +3,7 @@ package observer
 import (
 	"encoding/json"
 	"github.com/voodooEntity/archivist"
+	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/go-cyberbrain/src/system/core"
 	"github.com/voodooEntity/go-cyberbrain/src/system/job"
@@ -15,6 +16,7 @@ type Observer struct {
 	RootType          string
 	RootID            int
 	InactiveIncrement int
+	gitsInstance      *gits.Gits
 	Runners           []Tracker
 }
 
@@ -25,9 +27,10 @@ type Tracker struct {
 
 func New(rootType string, rootID int) *Observer {
 	archivist.Info("Creating observer")
+	gi := gits.GetDefault()
 	var runners []Tracker
 	qry := query.New().Read("Runner")
-	res := query.Execute(qry)
+	res := gi.Query().Execute(qry)
 	for _, val := range res.Entities {
 		runners = append(runners, Tracker{
 			ID:      val.ID,
@@ -39,6 +42,7 @@ func New(rootType string, rootID int) *Observer {
 		RootType:          rootType,
 		RootID:            rootID,
 		InactiveIncrement: 0,
+		gitsInstance:      gi,
 		Runners:           runners,
 	}
 }
@@ -54,7 +58,7 @@ func (self *Observer) Loop() {
 
 func (self *Observer) ReachedEndgame() bool {
 	runnerQry := query.New().Read("Runner").Match("Properties.State", "==", "Searching")
-	sysRunners := query.Execute(runnerQry)
+	sysRunners := self.gitsInstance.Query().Execute(runnerQry)
 	archivist.Debug("Observer: searching runners", sysRunners.Amount)
 	archivist.Debug("Observer: total amount created runners", len(core.Runners))
 	openJobs := job.GetOpenJobs()
@@ -91,7 +95,7 @@ func (self *Observer) Endgame() {
 		time.Sleep(10 * time.Millisecond)
 	}
 	finalDataQuery := query.New().Read(self.RootType).Match("ID", "==", strconv.Itoa(self.RootID)).TraverseOut(100).TraverseIn(100)
-	finalData := query.Execute(finalDataQuery)
+	finalData := self.gitsInstance.Query().Execute(finalDataQuery)
 	b, err := json.Marshal(finalData)
 	if err != nil {
 		archivist.Error("Error marshalling final data", err)
@@ -102,7 +106,7 @@ func (self *Observer) Endgame() {
 
 func (self *Observer) AllRunnersDead() bool {
 	qry := query.New().Read("Runner").Match("Properties.State", "==", "Dead")
-	runners := query.Execute(qry)
+	runners := self.gitsInstance.Query().Execute(qry)
 	if runners.Amount == len(core.Runners) {
 		return true
 	}

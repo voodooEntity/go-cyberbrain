@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"github.com/voodooEntity/archivist"
+	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/demultiplexer"
@@ -134,7 +135,7 @@ func enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures m
 func buildInputData(requirement transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) []transport.TransportEntity {
 	newJobs := []transport.TransportEntity{}
 	qry := rBuildQuery(requirement, lookup, pointer)
-	result := query.Execute(qry)
+	result := gits.GetDefault().Query().Execute(qry)
 
 	if 0 < result.Amount {
 		for _, enriched := range result.Entities {
@@ -203,7 +204,7 @@ func retrieveActionsByType(entityType string) [][2]string {
 			query.New().Read("Action"),
 		),
 	)
-	result := query.Execute(qry)
+	result := gits.GetDefault().Query().Execute(qry)
 	archivist.Debug("DependencyEntityLookup ", entityType, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {
@@ -222,7 +223,7 @@ func retrieveActionsByRelationStructure(relationStructure string) [][2]string {
 			query.New().Read("Action"),
 		),
 	)
-	result := query.Execute(qry)
+	result := gits.GetDefault().Query().Execute(qry)
 	archivist.Debug("DependencyRelationLookup ", relationStructure, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {

@@ -3,7 +3,6 @@ package core
 import (
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/gits/src/types"
 	"github.com/voodooEntity/go-cyberbrain/src/system/config"
 	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
 	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
@@ -15,11 +14,7 @@ var Runners []int
 
 func Init(configs map[string]string) {
 	// init the gits storage
-	gits.Init(types.PersistenceConfig{
-		PersistenceChannelBufferSize: 10000000,
-		Active:                       false,
-		RotationEntriesMax:           100000,
-	})
+	gits.NewInstance("data")
 
 	// then we populate the action registry
 	registry.Data = registry.New().Index()
@@ -44,7 +39,7 @@ func startRunners() {
 	cpuAmount := runtime.NumCPU()
 	//cpuAmount = 1
 	for i := 0; i < cpuAmount; i++ {
-		instance := runner.New(i, registry.Data)
+		instance := runner.New(i, registry.Data, gits.GetDefault())
 		go instance.Loop()
 		Runners = append(Runners, i)
 	}
@@ -71,7 +66,7 @@ func bringToLife() {
 
 func createNecessaryEntities() {
 	// create Open state
-	gits.MapTransportData(transport.TransportEntity{
+	gits.GetDefault().MapData(transport.TransportEntity{
 		ID:         0,
 		Type:       "State",
 		Value:      "Open",
@@ -79,7 +74,7 @@ func createNecessaryEntities() {
 		Properties: make(map[string]string),
 	})
 	// create Assigned state
-	gits.MapTransportData(transport.TransportEntity{
+	gits.GetDefault().MapData(transport.TransportEntity{
 		ID:         0,
 		Type:       "State",
 		Value:      "Assigned",

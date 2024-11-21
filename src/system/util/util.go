@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"github.com/voodooEntity/archivist"
+	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain-plugin-interface/src/interfaces"
@@ -56,7 +57,7 @@ func IsActive() bool {
 		"==",
 		"Alive",
 	)
-	ret := query.Execute(qry)
+	ret := gits.GetDefault().Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}
@@ -72,7 +73,7 @@ func Shutdown() bool {
 		"Properties.State",
 		"Dead",
 	)
-	ret := query.Execute(qry)
+	ret := gits.GetDefault().Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}

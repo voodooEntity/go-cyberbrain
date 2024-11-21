@@ -55,11 +55,11 @@ func (self Registry) registerModule(plug string, instance interfaces.PluginInter
 
 	// Get the mapped categories
 	catQry := query.New().Read("Action").Match("Value", "==", name).To(query.New().Read("Category").TraverseOut(10))
-	categories := query.Execute(catQry)
+	categories := gits.GetDefault().Query().Execute(catQry)
 
 	// Get the mapped dependencies
 	depQry := query.New().Read("Action").Match("Value", "==", name).To(query.New().Read("Dependency").TraverseOut(10))
-	dependencies := query.Execute(depQry)
+	dependencies := gits.GetDefault().Query().Execute(depQry)
 
 	// create a module struct instance satisfied with the just mapped config and dependency data & the plugin instance itself
 	moduleInstance := *action.New().SetName(name).SetDependencies(dependencies.Entities[0].Children()).SetCategories(categories.Entities[0].Children()).SetPlugin(instance)
@@ -97,7 +97,7 @@ func mapDependencyRelationLookupNodes(entity transport.TransportEntity) {
 	relationStructures = rFindRelationStructures(entity, relationStructures)
 	archivist.Info("Relation structures found in registry ", relationStructures)
 	for _, val := range relationStructures {
-		gits.MapTransportData(transport.TransportEntity{
+		gits.GetDefault().MapData(transport.TransportEntity{
 			Type:       "DependencyRelationLookup",
 			ID:         0,
 			Value:      val,
@@ -137,7 +137,7 @@ func rFindRelationStructures(entity transport.TransportEntity, relationStructure
 
 func mapDependencyEntityLookupNodes(dependencyTypes []string, dependencyId int) {
 	for _, val := range dependencyTypes {
-		gits.MapTransportData(transport.TransportEntity{
+		gits.GetDefault().MapData(transport.TransportEntity{
 			Type:       "DependencyEntityLookup",
 			ID:         0,
 			Value:      val,
