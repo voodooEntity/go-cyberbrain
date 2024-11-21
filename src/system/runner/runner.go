@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/voodooEntity/archivist"
+	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/job"
@@ -26,10 +27,11 @@ type Runner struct {
 	uid            string
 	intercom       [2]chan string
 	actionRegistry registry.Registry
+	gitsInstance   *gits.Gits
 	job            job.Job
 }
 
-func New(id int, taskRegistry registry.Registry) *Runner {
+func New(id int, taskRegistry registry.Registry, gitsInstance *gits.Gits) *Runner {
 	archivist.Info("Creating runner", id)
 	properties := make(map[string]string)
 	properties["State"] = "Searching"
@@ -45,6 +47,7 @@ func New(id int, taskRegistry registry.Registry) *Runner {
 		id:             id,
 		intercom:       [2]chan string{make(chan string, INTERCOM_BUFF_SIZE), make(chan string, INTERCOM_BUFF_SIZE)},
 		actionRegistry: taskRegistry,
+		gitsInstance:   gitsInstance,
 	}
 }
 
@@ -99,7 +102,7 @@ func (self *Runner) FindJob() bool {
 
 func (self *Runner) ExecuteJob() ([]transport.TransportEntity, error) {
 	qry := query.New().Read("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(query.New().Read("Job").To(query.New().Read("Input")))
-	ret := query.Execute(qry)
+	ret := self.gitsInstance.Query().Execute(qry)
 
 	if 0 == ret.Amount {
 		return []transport.TransportEntity{}, errors.New("Runner could not find any assigned job. This should be rather impossible")
@@ -159,7 +162,7 @@ func (self *Runner) AssignJob(newJob *job.Job) bool {
 		"==",
 		strconv.Itoa(newJob.GetID()),
 	)
-	query.Execute(qry)
+	self.gitsInstance.Query().Execute(qry)
 
 	self.job = *newJob
 
@@ -187,7 +190,7 @@ func (self *Runner) ChangeState(state string) {
 		"Properties.State",
 		state,
 	)
-	query.Execute(qry)
+	self.gitsInstance.Query().Execute(qry)
 }
 
 func (self *Runner) FinishJobSuccess(results []transport.TransportEntity) {
@@ -205,15 +208,15 @@ func (self *Runner) FinishJobSuccess(results []transport.TransportEntity) {
 		strconv.Itoa(self.id),
 	).To(query.New().Read("Job"))
 
-	runnerWithJob := query.Execute(qry)
+	runnerWithJob := self.gitsInstance.Query().Execute(qry)
 	jobId := runnerWithJob.Entities[0].Children()[0].ID
 	archivist.Debug("Detaching job from runner", runnerWithJob)
 	qry = query.New().Unlink("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
-	query.Execute(qry)
+	self.gitsInstance.Query().Execute(qry)
 
-	deleteJobAndInput(jobId)
+	self.deleteJobAndInput(jobId)
 	self.ChangeState("Searching")
 }
 
@@ -225,34 +228,34 @@ func (self *Runner) FinishJobError(err error) {
 		strconv.Itoa(self.id),
 	).To(query.New().Read("Job"))
 
-	runnerWithJob := query.Execute(qry)
+	runnerWithJob := self.gitsInstance.Query().Execute(qry)
 	jobId := runnerWithJob.Entities[0].Children()[0].ID
 	archivist.Debug("Detaching job from runner", runnerWithJob)
 	qry = query.New().Unlink("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
-	query.Execute(qry)
 
-	deleteJobAndInput(jobId)
+	self.gitsInstance.Query().Execute(qry)
+	self.deleteJobAndInput(jobId)
 	self.ChangeState("Searching")
 }
 
-func deleteJobAndInput(jobID int) {
+func (self *Runner) deleteJobAndInput(jobID int) {
 	jobQry := query.New().Read("Job").Match("ID", "==", strconv.Itoa(jobID)).To(
 		query.New().Read("Input"),
 	)
-	dat := query.Execute(jobQry)
+	dat := self.gitsInstance.Query().Execute(jobQry)
 
 	unlinkQuery := query.New().Unlink("Job").Match("Value", "==", strconv.Itoa(dat.Entities[0].ID)).To(
 		query.New().Find("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID)),
 	)
-	query.Execute(unlinkQuery)
+	self.gitsInstance.Query().Execute(unlinkQuery)
 
 	jobDeleteQry := query.New().Delete("Job").Match("ID", "==", strconv.Itoa(dat.Entities[0].ID))
-	query.Execute(jobDeleteQry)
+	self.gitsInstance.Query().Execute(jobDeleteQry)
 
 	inputDeleteQuery := query.New().Delete("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID))
-	query.Execute(inputDeleteQuery)
+	self.gitsInstance.Query().Execute(inputDeleteQuery)
 
 }
 

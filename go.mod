@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/voodooEntity/archivist v1.0.2
-	github.com/voodooEntity/gits v0.0.22
-	github.com/voodooEntity/gitsapi v0.0.18
+	github.com/voodooEntity/gits v0.9.1
+	github.com/voodooEntity/gitsapi v0.0.20
 )
 
 require (

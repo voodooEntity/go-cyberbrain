@@ -61,7 +61,7 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 		query.New().Find("State").Match("ID", "==", strconv.Itoa(openState.ID)),
 	)
 
-	query.Execute(linkQuery)
+	gits.GetDefault().Query().Execute(linkQuery)
 
 	archivist.Debug("Mapped new job", mapped)
 	return &Job{}
@@ -69,7 +69,7 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 
 func Load(id int) *Job {
 	// make sure that job actually exists
-	ret := query.Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(id)).TraverseOut(30)) // ### add max depth config for job
+	ret := gits.GetDefault().Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(id)).TraverseOut(30)) // ### add max depth config for job
 	if 0 < ret.Amount {
 		return &Job{
 			Data: ret.Entities[0],
@@ -82,21 +82,21 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 	// since we have to make sure we dont run into race conditions we gonne do some direct
 	// api calls into gits here. we may change this at some point to query logics or something else
 	// its not bad by design it just could be done smoother ###todo recheck if this cant be solved by qry where conditions
-	gits.EntityStorageMutex.Lock()
-	gits.RelationStorageMutex.Lock()
-	jobTypeID, err := gits.GetTypeIdByStringUnsafe("Job")
+	gits.GetDefault().Storage().EntityStorageMutex.Lock()
+	gits.GetDefault().Storage().RelationStorageMutex.Lock()
+	jobTypeID, err := gits.GetDefault().Storage().GetTypeIdByStringUnsafe("Job")
 	if nil != err {
 		// this shouldn't be happening but rather handle every error than assume its impossible
 		archivist.Debug("The impossible occured. Run you fools")
-		gits.EntityStorageMutex.Unlock()
-		gits.RelationStorageMutex.Unlock()
+		gits.GetDefault().Storage().EntityStorageMutex.Unlock()
+		gits.GetDefault().Storage().RelationStorageMutex.Unlock()
 		return false
 	}
 
-	e, err := gits.GetEntityByPathUnsafe(jobTypeID, self.Data.ID, "")
+	e, err := gits.GetDefault().Storage().GetEntityByPathUnsafe(jobTypeID, self.Data.ID, "")
 	if nil != err {
-		gits.EntityStorageMutex.Unlock()
-		gits.RelationStorageMutex.Unlock()
+		gits.GetDefault().Storage().EntityStorageMutex.Unlock()
+		gits.GetDefault().Storage().RelationStorageMutex.Unlock()
 		archivist.Debug("Runner tries to assign nonexisting job", self.Data.ID)
 		return false
 	}
@@ -108,26 +108,26 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 		Version:    e.Version,
 	}
 
-	childRelations, _ := gits.GetChildRelationsBySourceTypeAndSourceIdUnsafe(jobTypeID, e.ID, "")
-	stateTypeID, _ := gits.GetTypeIdByStringUnsafe("State")
+	childRelations, _ := gits.GetDefault().Storage().GetChildRelationsBySourceTypeAndSourceIdUnsafe(jobTypeID, e.ID, "")
+	stateTypeID, _ := gits.GetDefault().Storage().GetTypeIdByStringUnsafe("State")
 	for _, childRelation := range childRelations {
 		if stateTypeID == childRelation.TargetType {
-			openState, _ := gits.GetEntityByPathUnsafe(stateTypeID, childRelation.TargetID, "")
+			openState, _ := gits.GetDefault().Storage().GetEntityByPathUnsafe(stateTypeID, childRelation.TargetID, "")
 			archivist.Debug("state retrieved from job", openState)
 			if "Open" != openState.Value {
-				gits.EntityStorageMutex.Unlock()
-				gits.RelationStorageMutex.Unlock()
+				gits.GetDefault().Storage().EntityStorageMutex.Unlock()
+				gits.GetDefault().Storage().RelationStorageMutex.Unlock()
 				archivist.Debug("Runner tries to assign job that state is not Open", self.Data.ID)
 				return false
 			}
 			// detach open state from job
-			gits.DeleteRelationUnsafe(e.Type, e.ID, stateTypeID, openState.ID)
+			gits.GetDefault().Storage().DeleteRelationUnsafe(e.Type, e.ID, stateTypeID, openState.ID)
 			//gits.DeleteEntityUnsafe(openState.Type, openState.ID)
 			// get assigned state entity
-			assignedState, _ := gits.GetEntitiesByTypeAndValueUnsafe("State", "Assigned", "match", "System")
+			assignedState, _ := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe("State", "Assigned", "match", "System")
 			archivist.Debug("assigned state entity", assignedState)
 			// now we map the job to the assigned entity
-			gits.CreateRelationUnsafe(e.Type, e.ID, stateTypeID, assignedState[0].ID, types.StorageRelation{
+			gits.GetDefault().Storage().CreateRelationUnsafe(e.Type, e.ID, stateTypeID, assignedState[0].ID, types.StorageRelation{
 				SourceType: jobTypeID,
 				SourceID:   e.ID,
 				TargetType: stateTypeID,
@@ -140,9 +140,9 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 
 	// finally we assign the job to the runner
 	//runnerTypeID, _ := gits.GetTypeIdByStringUnsafe("Runner")
-	runnerEntity, _ := gits.GetEntitiesByTypeAndValueUnsafe("Runner", strconv.Itoa(runnerID), "match", "Bezel")
+	runnerEntity, _ := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe("Runner", strconv.Itoa(runnerID), "match", "Bezel")
 	archivist.Debug("Map runner to job", runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID)
-	gits.CreateRelationUnsafe(runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID, types.StorageRelation{
+	gits.GetDefault().Storage().CreateRelationUnsafe(runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID, types.StorageRelation{
 		SourceType: runnerEntity[0].Type,
 		SourceID:   runnerEntity[0].ID,
 		TargetType: jobTypeID,
@@ -151,13 +151,13 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 		Properties: make(map[string]string),
 	})
 
-	gits.EntityStorageMutex.Unlock()
-	gits.RelationStorageMutex.Unlock()
+	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
+	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
 	return true
 }
 
 func (self *Job) GetState() string {
-	ret := query.Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(self.Data.ID)).To(query.New().Read("State")))
+	ret := gits.GetDefault().Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(self.Data.ID)).To(query.New().Read("State")))
 	if 0 < ret.Amount {
 		return ret.Entities[0].Children()[0].Value
 	}
@@ -176,5 +176,5 @@ func (self *Job) GetID() int {
 func GetOpenJobs() transport.Transport {
 	qry := query.New().Read("State").Match("Value", "==", "Open").Match("Context", "==", "System").From(
 		query.New().Read("Job").Match("Context", "==", "System"))
-	return query.Execute(qry)
+	return gits.GetDefault().Query().Execute(qry)
 }
