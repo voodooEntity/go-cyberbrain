@@ -27,7 +27,7 @@ func BuildPlugins(pluginsPath string, abilitiesPath string, filter string) {
 	}
 
 	for _, ability := range abilities {
-		if !strings.Contains(ability, filter) && ability != "util" {
+		if !strings.Contains(ability, filter) || ability == "util" {
 			continue
 		}
 		archivist.Info("++ Plugin: " + ability)

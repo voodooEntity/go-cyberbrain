@@ -3,3 +3,4 @@
 cmd/cli/*
 cmd/cyberbrain/cyberbrain
 cmd/cyberbrain/plugins/
+cmd/test/test.go
