@@ -22,7 +22,7 @@ import (
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
 
-const version = "v0.1.0"
+const version = "v0.1.2"
 
 func main() {
 	//initially we gonne parse the cli args

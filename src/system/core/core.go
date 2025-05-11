@@ -27,12 +27,6 @@ func Init(configs map[string]string) {
 
 	// now we start our runners
 	startRunners()
-
-	// keep the main thread alife
-	//for {
-	// Sleep for a short duration to avoid consuming excessive CPU
-	//	time.Sleep(time.Second)
-	//}
 }
 
 func startRunners() {
