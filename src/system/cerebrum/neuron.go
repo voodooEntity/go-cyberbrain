@@ -121,7 +121,7 @@ func (n *Neuron) ExecuteJob() ([]transport.TransportEntity, error) {
 	// clear bMap properties from inputEntity, so we don't endless run
 	rRemovebMap(inputEntity)
 	// finally we execute it
-	results, err := jobAction.GetInstance().Execute(n.memory, inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Neuron")
+	results, err := jobAction.GetInstance().Execute(n.memory.Gits, inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Neuron")
 	if nil != err {
 		return []transport.TransportEntity{}, errors.New("Job: " + ret.Entities[0].Children()[0].Value + " execution failed with error " + err.Error())
 	}
