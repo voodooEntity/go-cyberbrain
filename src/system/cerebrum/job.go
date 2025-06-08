@@ -1,4 +1,4 @@
-package job
+package cerebrum
 
 import (
 	"encoding/json"
@@ -6,17 +6,24 @@ import (
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/gits/src/types"
-	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
+	gitsTypes "github.com/voodooEntity/gits/src/types"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 	"strconv"
 )
 
 type Job struct {
-	Data transport.TransportEntity
+	data   transport.TransportEntity
+	memory *Memory
+	id     int
 }
 
-func Create(action string, requirement string, input transport.TransportEntity) *Job {
+func NewJob(memoryInstance *Memory) *Job {
+	return &Job{
+		memory: memoryInstance,
+	}
+}
+
+func (j *Job) Create(action string, requirement string, input transport.TransportEntity) *Job {
 	jobProperties := make(map[string]string)
 	jobProperties["Action"] = action
 	jobProperties["Requirement"] = requirement
@@ -30,7 +37,7 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 
 	// refer to existing state:open instead of mapping like this since we use parent as related check and
 	// parent is new created
-	mapped := mapper.MapTransportDataWithContextForceCreate(transport.TransportEntity{
+	mapped := j.memory.Mapper.MapTransportDataWithContextForceCreate(transport.TransportEntity{
 		ID:         -1,
 		Type:       "Job",
 		Context:    "system",
@@ -49,7 +56,7 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 		},
 	}, "System")
 
-	openState := mapper.MapTransportData(transport.TransportEntity{
+	openState := j.memory.Mapper.MapTransportData(transport.TransportEntity{
 		Type:       "State",
 		Value:      "Open",
 		Context:    "System",
@@ -61,46 +68,50 @@ func Create(action string, requirement string, input transport.TransportEntity) 
 		query.New().Find("State").Match("ID", "==", strconv.Itoa(openState.ID)),
 	)
 
-	gits.GetDefault().Query().Execute(linkQuery)
+	j.memory.Gits.Query().Execute(linkQuery)
 
 	archivist.Debug("Mapped new job", mapped)
-	return &Job{}
+	return &Job{
+		id: mapped.ID,
+	}
 }
 
-func Load(id int) *Job {
+func Load(id int, memoryInstance *Memory) *Job {
 	// make sure that job actually exists
-	ret := gits.GetDefault().Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(id)).TraverseOut(30)) // ### add max depth config for job
+	ret := memoryInstance.Gits.Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(id)).TraverseOut(30)) // ### add max depth config for job
 	if 0 < ret.Amount {
 		return &Job{
-			Data: ret.Entities[0],
+			id:     id,
+			data:   ret.Entities[0],
+			memory: memoryInstance,
 		}
 	}
 	return nil
 }
 
-func (self *Job) AssignToRunner(runnerID int) bool {
+func (j *Job) AssignToRunner(runnerID int) bool {
 	// since we have to make sure we dont run into race conditions we gonne do some direct
 	// api calls into gits here. we may change this at some point to query logics or something else
 	// its not bad by design it just could be done smoother ###todo recheck if this cant be solved by qry where conditions
-	gits.GetDefault().Storage().EntityStorageMutex.Lock()
-	gits.GetDefault().Storage().RelationStorageMutex.Lock()
-	jobTypeID, err := gits.GetDefault().Storage().GetTypeIdByStringUnsafe("Job")
+	j.memory.Gits.Storage().EntityStorageMutex.Lock()
+	j.memory.Gits.Storage().RelationStorageMutex.Lock()
+	jobTypeID, err := j.memory.Gits.Storage().GetTypeIdByStringUnsafe("Job")
 	if nil != err {
 		// this shouldn't be happening but rather handle every error than assume its impossible
 		archivist.Debug("The impossible occured. Run you fools")
-		gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-		gits.GetDefault().Storage().RelationStorageMutex.Unlock()
+		j.memory.Gits.Storage().EntityStorageMutex.Unlock()
+		j.memory.Gits.Storage().RelationStorageMutex.Unlock()
 		return false
 	}
 
-	e, err := gits.GetDefault().Storage().GetEntityByPathUnsafe(jobTypeID, self.Data.ID, "")
+	e, err := j.memory.Gits.Storage().GetEntityByPathUnsafe(jobTypeID, j.data.ID, "")
 	if nil != err {
-		gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-		gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-		archivist.Debug("Runner tries to assign nonexisting job", self.Data.ID)
+		j.memory.Gits.Storage().EntityStorageMutex.Unlock()
+		j.memory.Gits.Storage().RelationStorageMutex.Unlock()
+		archivist.Debug("Runner tries to assign nonexisting job", j.data.ID)
 		return false
 	}
-	self.Data = transport.TransportEntity{
+	j.data = transport.TransportEntity{
 		Type:       "Job",
 		ID:         e.ID,
 		Context:    e.Context,
@@ -108,26 +119,26 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 		Version:    e.Version,
 	}
 
-	childRelations, _ := gits.GetDefault().Storage().GetChildRelationsBySourceTypeAndSourceIdUnsafe(jobTypeID, e.ID, "")
-	stateTypeID, _ := gits.GetDefault().Storage().GetTypeIdByStringUnsafe("State")
+	childRelations, _ := j.memory.Gits.Storage().GetChildRelationsBySourceTypeAndSourceIdUnsafe(jobTypeID, e.ID, "")
+	stateTypeID, _ := j.memory.Gits.Storage().GetTypeIdByStringUnsafe("State")
 	for _, childRelation := range childRelations {
 		if stateTypeID == childRelation.TargetType {
-			openState, _ := gits.GetDefault().Storage().GetEntityByPathUnsafe(stateTypeID, childRelation.TargetID, "")
+			openState, _ := j.memory.Gits.Storage().GetEntityByPathUnsafe(stateTypeID, childRelation.TargetID, "")
 			archivist.Debug("state retrieved from job", openState)
 			if "Open" != openState.Value {
-				gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-				gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-				archivist.Debug("Runner tries to assign job that state is not Open", self.Data.ID)
+				j.memory.Gits.Storage().EntityStorageMutex.Unlock()
+				j.memory.Gits.Storage().RelationStorageMutex.Unlock()
+				archivist.Debug("Runner tries to assign job that state is not Open", j.data.ID)
 				return false
 			}
 			// detach open state from job
-			gits.GetDefault().Storage().DeleteRelationUnsafe(e.Type, e.ID, stateTypeID, openState.ID)
+			j.memory.Gits.Storage().DeleteRelationUnsafe(e.Type, e.ID, stateTypeID, openState.ID)
 			//gits.DeleteEntityUnsafe(openState.Type, openState.ID)
 			// get assigned state entity
-			assignedState, _ := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe("State", "Assigned", "match", "System")
+			assignedState, _ := j.memory.Gits.Storage().GetEntitiesByTypeAndValueUnsafe("State", "Assigned", "match", "System")
 			archivist.Debug("assigned state entity", assignedState)
 			// now we map the job to the assigned entity
-			gits.GetDefault().Storage().CreateRelationUnsafe(e.Type, e.ID, stateTypeID, assignedState[0].ID, types.StorageRelation{
+			j.memory.Gits.Storage().CreateRelationUnsafe(e.Type, e.ID, stateTypeID, assignedState[0].ID, gitsTypes.StorageRelation{
 				SourceType: jobTypeID,
 				SourceID:   e.ID,
 				TargetType: stateTypeID,
@@ -138,11 +149,11 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 		}
 	}
 
-	// finally we assign the job to the runner
+	// finally we assign the job to the neuron
 	//runnerTypeID, _ := gits.GetTypeIdByStringUnsafe("Runner")
-	runnerEntity, _ := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe("Runner", strconv.Itoa(runnerID), "match", "Bezel")
-	archivist.Debug("Map runner to job", runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID)
-	gits.GetDefault().Storage().CreateRelationUnsafe(runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID, types.StorageRelation{
+	runnerEntity, _ := j.memory.Gits.Storage().GetEntitiesByTypeAndValueUnsafe("Neuron", strconv.Itoa(runnerID), "match", "Bezel")
+	archivist.Debug("Map neuron to job", runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID)
+	j.memory.Gits.Storage().CreateRelationUnsafe(runnerEntity[0].Type, runnerEntity[0].ID, jobTypeID, e.ID, gitsTypes.StorageRelation{
 		SourceType: runnerEntity[0].Type,
 		SourceID:   runnerEntity[0].ID,
 		TargetType: jobTypeID,
@@ -151,30 +162,26 @@ func (self *Job) AssignToRunner(runnerID int) bool {
 		Properties: make(map[string]string),
 	})
 
-	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
+	j.memory.Gits.Storage().EntityStorageMutex.Unlock()
+	j.memory.Gits.Storage().RelationStorageMutex.Unlock()
 	return true
 }
 
-func (self *Job) GetState() string {
-	ret := gits.GetDefault().Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(self.Data.ID)).To(query.New().Read("State")))
+func (j *Job) GetState() string {
+	ret := j.memory.Gits.Query().Execute(query.New().Read("Job").Match("ID", "==", strconv.Itoa(j.data.ID)).To(query.New().Read("State")))
 	if 0 < ret.Amount {
 		return ret.Entities[0].Children()[0].Value
 	}
-	archivist.Error("Retrieving state of an non existing job , should actually not happen, jobid is ", self.GetID())
+	archivist.Error("Retrieving state of an non existing job , should actually not happen, jobid is ", j.GetID())
 	return ""
 }
 
-func (self *Job) ChangeState(newState string) {
-	// ###todo implement consider timing issues
-}
-
 func (self *Job) GetID() int {
-	return self.Data.ID
+	return self.data.ID
 }
 
-func GetOpenJobs() transport.Transport {
+func GetOpenJobs(gitsInstance *gits.Gits) transport.Transport {
 	qry := query.New().Read("State").Match("Value", "==", "Open").Match("Context", "==", "System").From(
 		query.New().Read("Job").Match("Context", "==", "System"))
-	return gits.GetDefault().Query().Execute(qry)
+	return gitsInstance.Query().Execute(qry)
 }

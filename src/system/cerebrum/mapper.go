@@ -1,4 +1,4 @@
-package mapper
+package cerebrum
 
 import (
 	"github.com/voodooEntity/archivist"
@@ -9,80 +9,90 @@ import (
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
 
+type Mapper struct {
+	gits *gits.Gits
+}
+
+func NewMapper(gits *gits.Gits) *Mapper {
+	return &Mapper{
+		gits: gits,
+	}
+}
+
 // custom implementation of gits MapTransportData. Since we need to identify
 // every new dataset for later dispatching of new jobs its important to store
 // all those in some way. This code is very close to the one from gits tho
 // for the moment the given functionality is not neccesary for gits so its not
 // implemented in storage itself
-func MapTransportData(data transport.TransportEntity) transport.TransportEntity {
+func (m *Mapper) MapTransportData(data transport.TransportEntity) transport.TransportEntity {
 	// first we lock all the storages
-	gits.GetDefault().Storage().EntityTypeMutex.Lock()
-	gits.GetDefault().Storage().EntityStorageMutex.Lock()
-	gits.GetDefault().Storage().RelationStorageMutex.Lock()
+	m.gits.Storage().EntityTypeMutex.Lock()
+	m.gits.Storage().EntityStorageMutex.Lock()
+	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportData ", data)
-	ret := mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", false, nil)
+	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", false, nil)
 
 	// now we unlock all the mutexes again
-	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityTypeMutex.Unlock()
+	m.gits.Storage().RelationStorageMutex.Unlock()
+	m.gits.Storage().EntityStorageMutex.Unlock()
+	m.gits.Storage().EntityTypeMutex.Unlock()
 
 	return ret
 }
 
-func MapTransportDataWithContext(data transport.TransportEntity, context string) transport.TransportEntity {
+func (m *Mapper) MapTransportDataWithContext(data transport.TransportEntity, context string) transport.TransportEntity {
 	// first we lock all the storages
-	gits.GetDefault().Storage().EntityTypeMutex.Lock()
-	gits.GetDefault().Storage().EntityStorageMutex.Lock()
-	gits.GetDefault().Storage().RelationStorageMutex.Lock()
+	m.gits.Storage().EntityTypeMutex.Lock()
+	m.gits.Storage().EntityStorageMutex.Lock()
+	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataWithContext ", data)
-	ret := mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, false, nil)
+	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, false, nil)
 
 	// now we unlock all the mutexes again
-	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityTypeMutex.Unlock()
+	m.gits.Storage().RelationStorageMutex.Unlock()
+	m.gits.Storage().EntityStorageMutex.Unlock()
+	m.gits.Storage().EntityTypeMutex.Unlock()
 
 	return ret
 }
 
-func MapTransportDataWithContextForceCreate(data transport.TransportEntity, context string) transport.TransportEntity {
+func (m *Mapper) MapTransportDataWithContextForceCreate(data transport.TransportEntity, context string) transport.TransportEntity {
 	// first we lock all the storages
-	gits.GetDefault().Storage().EntityTypeMutex.Lock()
-	gits.GetDefault().Storage().EntityStorageMutex.Lock()
-	gits.GetDefault().Storage().RelationStorageMutex.Lock()
+	m.gits.Storage().EntityTypeMutex.Lock()
+	m.gits.Storage().EntityStorageMutex.Lock()
+	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataWithContextForceCreate ", data)
-	ret := mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, true, nil)
+	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, true, nil)
 
 	// now we unlock all the mutexes again
-	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityTypeMutex.Unlock()
+	m.gits.Storage().RelationStorageMutex.Unlock()
+	m.gits.Storage().EntityStorageMutex.Unlock()
+	m.gits.Storage().EntityTypeMutex.Unlock()
 
 	return ret
 }
 
-func MapTransportDataForceCreate(data transport.TransportEntity) transport.TransportEntity {
+func (m *Mapper) MapTransportDataForceCreate(data transport.TransportEntity) transport.TransportEntity {
 	// first we lock all the storages
-	gits.GetDefault().Storage().EntityTypeMutex.Lock()
-	gits.GetDefault().Storage().EntityStorageMutex.Lock()
-	gits.GetDefault().Storage().RelationStorageMutex.Lock()
+	m.gits.Storage().EntityTypeMutex.Lock()
+	m.gits.Storage().EntityStorageMutex.Lock()
+	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
 	archivist.DebugF("MapTransportDataForceCreate ", data)
-	ret := mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", true, nil)
+	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", true, nil)
 
 	// now we unlock all the mutexes again
 
-	gits.GetDefault().Storage().RelationStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityStorageMutex.Unlock()
-	gits.GetDefault().Storage().EntityTypeMutex.Unlock()
+	m.gits.Storage().RelationStorageMutex.Unlock()
+	m.gits.Storage().EntityStorageMutex.Unlock()
+	m.gits.Storage().EntityTypeMutex.Unlock()
 
 	return ret
 }
@@ -93,15 +103,15 @@ type RecursiveMapCtx struct {
 	Direction      int
 }
 
-func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID int, direction int, overwriteContext string, forceCreate bool, ctx *RecursiveMapCtx) transport.TransportEntity {
+func (m *Mapper) mapRecursive(entity transport.TransportEntity, relatedType int, relatedID int, direction int, overwriteContext string, forceCreate bool, ctx *RecursiveMapCtx) transport.TransportEntity {
 	// first we get the right TypeID
 	var TypeID int
 	var err error
 	var newEntity types.StorageEntity
 	createEntity := false
-	TypeID, err = gits.GetDefault().Storage().GetTypeIdByStringUnsafe(entity.Type)
+	TypeID, err = m.gits.Storage().GetTypeIdByStringUnsafe(entity.Type)
 	if nil != err {
-		TypeID, _ = gits.GetDefault().Storage().CreateEntityTypeUnsafe(entity.Type)
+		TypeID, _ = m.gits.Storage().CreateEntityTypeUnsafe(entity.Type)
 	}
 
 	// now we check if its a forceCreate. If yes we gonne overwrite
@@ -128,7 +138,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		// ##### mapID, _ = gits.CreateEntityUnsafe(newEntity)
 		entity.Properties["bMap"] = ""
 	} else if -2 == entity.ID {
-		tmp, _ := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
+		tmp, _ := m.gits.Storage().GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
 		if 0 < len(tmp) {
 			mapID = tmp[0].ID
 		} else {
@@ -148,11 +158,11 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 	} else if 0 == entity.ID {
 		// checking if a source related entity exists with the same value, if yes map onto it, if not create it.
 		// this could be extended by using structural uniqueness defintions of we see those are neccesary
-		rEntity, hit, _ := getRelatedEntityWithTypeAndValue(entity, TypeID, relatedType, relatedID, direction) // ### skipping error value as _ for now, recheck later
+		rEntity, hit, _ := m.getRelatedEntityWithTypeAndValue(entity, TypeID, relatedType, relatedID, direction) // ### skipping error value as _ for now, recheck later
 		// we found a related entity with the same value so we use it for further processing
 		if hit {
 			mapID = rEntity.ID
-			TypeID, _ = gits.GetDefault().Storage().GetTypeIdByStringUnsafe(rEntity.Type) // ### error supressed because we get the type of an entity we just retrieved while in a locked state errors should be impossible
+			TypeID, _ = m.gits.Storage().GetTypeIdByStringUnsafe(rEntity.Type) // ### error supressed because we get the type of an entity we just retrieved while in a locked state errors should be impossible
 		} else {
 			// there is no related entity existing with the given value so we create one
 			newEntity = types.StorageEntity{
@@ -185,7 +195,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		if "" != overwriteContext {
 			newEntity.Context = overwriteContext
 		}
-		mapID, _ = gits.GetDefault().Storage().CreateEntityUnsafe(newEntity)
+		mapID, _ = m.gits.Storage().CreateEntityUnsafe(newEntity)
 	}
 
 	// lets map the child elements
@@ -195,7 +205,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		for key, childRelation := range entity.ChildRelations {
 			// pas the child entity and the parent coords to
 			// create the relation after inserting the entity
-			entity.ChildRelations[key].Target = mapRecursive(childRelation.Target, TypeID, mapID, storage.DIRECTION_CHILD, overwriteContext, forceCreate, &RecursiveMapCtx{
+			entity.ChildRelations[key].Target = m.mapRecursive(childRelation.Target, TypeID, mapID, storage.DIRECTION_CHILD, overwriteContext, forceCreate, &RecursiveMapCtx{
 				SourceEntity:   &entity,
 				SourceRelation: &entity.ChildRelations[key],
 				Direction:      storage.DIRECTION_CHILD,
@@ -209,7 +219,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		for key, parentRelation := range entity.ParentRelations {
 			// pas the child entity and the parent coords to
 			// create the relation after inserting the entity
-			entity.ParentRelations[key].Target = mapRecursive(parentRelation.Target, TypeID, mapID, storage.DIRECTION_PARENT, overwriteContext, forceCreate, &RecursiveMapCtx{
+			entity.ParentRelations[key].Target = m.mapRecursive(parentRelation.Target, TypeID, mapID, storage.DIRECTION_PARENT, overwriteContext, forceCreate, &RecursiveMapCtx{
 				SourceEntity:   &entity,
 				SourceRelation: &entity.ParentRelations[key],
 				Direction:      storage.DIRECTION_PARENT,
@@ -224,7 +234,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 		// lets create the relation to our parent
 		if storage.DIRECTION_CHILD == direction {
 			// first we make sure the relation doesnt already exist (because we allow mapped existing data inside a to map json)
-			if !gits.GetDefault().Storage().RelationExistsUnsafe(relatedType, relatedID, TypeID, mapID) {
+			if !m.gits.Storage().RelationExistsUnsafe(relatedType, relatedID, TypeID, mapID) {
 				tmpRelation := types.StorageRelation{
 					SourceType: relatedType,
 					SourceID:   relatedID,
@@ -232,12 +242,12 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 					TargetID:   mapID,
 					Version:    1,
 				}
-				gits.GetDefault().Storage().CreateRelationUnsafe(relatedType, relatedID, TypeID, mapID, tmpRelation)
+				m.gits.Storage().CreateRelationUnsafe(relatedType, relatedID, TypeID, mapID, tmpRelation)
 				createdRelation = true
 			}
 		} else if storage.DIRECTION_PARENT == direction {
 			// first we make sure the relation doesnt already exist (because we allow mapped existing data inside a to map json)
-			if !gits.GetDefault().Storage().RelationExistsUnsafe(TypeID, mapID, relatedType, relatedID) {
+			if !m.gits.Storage().RelationExistsUnsafe(TypeID, mapID, relatedType, relatedID) {
 				// or relation towards the child
 				tmpRelation := types.StorageRelation{
 					SourceType: TypeID,
@@ -246,7 +256,7 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 					TargetID:   relatedID,
 					Version:    1,
 				}
-				gits.GetDefault().Storage().CreateRelationUnsafe(TypeID, mapID, relatedType, relatedID, tmpRelation)
+				m.gits.Storage().CreateRelationUnsafe(TypeID, mapID, relatedType, relatedID, tmpRelation)
 				createdRelation = true
 			}
 		}
@@ -266,9 +276,9 @@ func mapRecursive(entity transport.TransportEntity, relatedType int, relatedID i
 	return entity
 }
 
-func getRelatedEntityWithTypeAndValue(entity transport.TransportEntity, entityTypeID int, relatedType int, relatedID int, direction int) (transport.TransportEntity, bool, error) {
+func (m *Mapper) getRelatedEntityWithTypeAndValue(entity transport.TransportEntity, entityTypeID int, relatedType int, relatedID int, direction int) (transport.TransportEntity, bool, error) {
 	archivist.Debug("Trying to find related entity by type, value and related addr", entity, entityTypeID, relatedType, relatedID, direction)
-	entities, err := gits.GetDefault().Storage().GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
+	entities, err := m.gits.Storage().GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
 	archivist.Debug("Followin entities retrieved by type and value", entities)
 
 	// we skipping on error here. this errors can only appear if given entity.Type doesnt exist.
@@ -305,7 +315,7 @@ func getRelatedEntityWithTypeAndValue(entity transport.TransportEntity, entityTy
 			betaType = entityTypeID
 			betaID = resultEntity.ID
 		}
-		if gits.GetDefault().Storage().RelationExistsUnsafe(alphaType, alphaID, betaType, betaID) {
+		if m.gits.Storage().RelationExistsUnsafe(alphaType, alphaID, betaType, betaID) {
 			return transport.TransportEntity{
 				Type:       entity.Type,
 				ID:         resultEntity.ID,

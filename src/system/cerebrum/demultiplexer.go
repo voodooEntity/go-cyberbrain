@@ -1,11 +1,18 @@
-package demultiplexer
+package cerebrum
 
 import (
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
 
-func Parse(entity transport.TransportEntity) []transport.TransportEntity {
+type Demultiplexer struct {
+}
+
+func NewDemultiplexer() *Demultiplexer {
+	return &Demultiplexer{}
+}
+
+func (d *Demultiplexer) Parse(entity transport.TransportEntity) []transport.TransportEntity {
 	// prepare return data & some var initis
 	var ret []transport.TransportEntity
 	typeLookup := make(map[string]int)
@@ -25,12 +32,12 @@ func Parse(entity transport.TransportEntity) []transport.TransportEntity {
 		demultiplexedTypePointer := make([][]*transport.TransportEntity, len(typePointer))
 		for typeId, typePointerList := range typePointer {
 			for _, singlePointer := range typePointerList {
-				demultiplexedTypePointer[typeId] = append(demultiplexedTypePointer[typeId], generateEntityPointerList(Parse(*singlePointer))...)
+				demultiplexedTypePointer[typeId] = append(demultiplexedTypePointer[typeId], d.generateEntityPointerList(d.Parse(*singlePointer))...)
 			}
 		}
 
 		// now we generate all possible recombinations in which each child entity Type  each type occurs once
-		recombinations := generateRecombinations(demultiplexedTypePointer)
+		recombinations := d.generateRecombinations(demultiplexedTypePointer)
 
 		for _, recombinationSet := range recombinations {
 			var tmpChildren []transport.TransportRelation
@@ -60,7 +67,7 @@ func Parse(entity transport.TransportEntity) []transport.TransportEntity {
 	return ret
 }
 
-func generateEntityPointerList(data []transport.TransportEntity) []*transport.TransportEntity {
+func (d *Demultiplexer) generateEntityPointerList(data []transport.TransportEntity) []*transport.TransportEntity {
 	var ret []*transport.TransportEntity
 	for k := range data {
 		ret = append(ret, &(data[k]))
@@ -68,7 +75,7 @@ func generateEntityPointerList(data []transport.TransportEntity) []*transport.Tr
 	return ret
 }
 
-func generateRecombinations(data [][]*transport.TransportEntity) [][]*transport.TransportEntity {
+func (d *Demultiplexer) generateRecombinations(data [][]*transport.TransportEntity) [][]*transport.TransportEntity {
 	if len(data) == 0 {
 		return [][]*transport.TransportEntity{}
 	}
@@ -79,7 +86,7 @@ func generateRecombinations(data [][]*transport.TransportEntity) [][]*transport.
 	firstRow := data[0]
 
 	// Recursively generate recombinations for the remaining rows
-	remainingRows := generateRecombinations(data[1:])
+	remainingRows := d.generateRecombinations(data[1:])
 
 	// If there are no remaining rows, return the first row as the only combination
 	if len(remainingRows) == 0 {

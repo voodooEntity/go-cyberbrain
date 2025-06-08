@@ -1,71 +1,69 @@
-package runner
+package cerebrum
 
 import (
 	"encoding/json"
 	"errors"
 	"github.com/voodooEntity/archivist"
-	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain/src/system/job"
-	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
-	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
-	"github.com/voodooEntity/go-cyberbrain/src/system/scheduler"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 	"strconv"
 	"time"
 )
 
+// currently not in active use. ###
 const (
 	INTERCOM_BUFF_SIZE   int = 100000
 	INTERCOM_INPUT_CHAN  int = 0
 	INTERCOM_OUTPUT_CHAN int = 1
 )
 
-type Runner struct {
-	id             int
-	uid            string
-	intercom       [2]chan string
-	actionRegistry registry.Registry
-	gitsInstance   *gits.Gits
-	job            job.Job
+type Neuron struct {
+	id       int
+	uid      string
+	intercom [2]chan string
+	cortex   *Cortex
+	job      Job
+	memory   *Memory
+	activity *Activity
 }
 
-func New(id int, taskRegistry registry.Registry, gitsInstance *gits.Gits) *Runner {
-	archivist.Info("Creating runner", id)
+func NewNeuron(id int, cortexInstance *Cortex, memoryInstance *Memory, activityInstance *Activity) *Neuron {
+	archivist.Info("Creating neuron", id)
 	properties := make(map[string]string)
 	properties["State"] = "Searching"
-	mapper.MapTransportData(transport.TransportEntity{
+	memoryInstance.Mapper.MapTransportData(transport.TransportEntity{
 		ID:         -1,
-		Type:       "Runner",
+		Type:       "Neuron",
 		Value:      strconv.Itoa(id),
 		Context:    "Bezel",
 		Properties: properties,
 	})
 
-	return &Runner{
-		id:             id,
-		intercom:       [2]chan string{make(chan string, INTERCOM_BUFF_SIZE), make(chan string, INTERCOM_BUFF_SIZE)},
-		actionRegistry: taskRegistry,
-		gitsInstance:   gitsInstance,
+	return &Neuron{
+		id:       id,
+		intercom: [2]chan string{make(chan string, INTERCOM_BUFF_SIZE), make(chan string, INTERCOM_BUFF_SIZE)},
+		cortex:   cortexInstance,
+		memory:   memoryInstance,
+		activity: activityInstance,
 	}
 }
 
-func (self *Runner) Loop() {
+func (n *Neuron) Loop() {
 	for util.IsActive() {
-		archivist.Debug("Runner looping id: ", self.id)
+		archivist.Debug("Neuron looping id: ", n.id)
 		// lets try to assign a job
-		if self.FindJob() {
+		if n.FindJob() {
 			// now we gonne try execute the just assigned job
-			results, err := self.ExecuteJob()
+			results, err := n.ExecuteJob()
 			// did it work out?
 			if nil != err {
-				self.FinishJobError(err)
+				n.FinishJobError(err)
 				// ### todo think about how to handle errors
 			} else {
 				// now we map the data into our storage and run the result of the mapper
 				// through our scheduler to create new Jobs based on what we just learned
-				self.FinishJobSuccess(results)
+				n.FinishJobSuccess(results)
 			}
 		} else {
 			//			time.Sleep(1000000000)
@@ -73,23 +71,23 @@ func (self *Runner) Loop() {
 		}
 		//time.Sleep(time.Second * 4)
 	}
-	self.ChangeState("Dead")
-	archivist.Info("Cyberbrain has been shutdown, runner exiting")
+	n.ChangeState("Dead")
+	archivist.Info("Cyberbrain has been shutdown, neuron exiting")
 }
 
-func (self *Runner) FindJob() bool {
+func (n *Neuron) FindJob() bool {
 	// query can be optimized by joining ###todo
-	jobList := job.GetOpenJobs()
+	jobList := GetOpenJobs(n.memory.Gits)
 	archivist.Debug("Open Jobs found", jobList)
 	// if there are any jobs
 	if 0 < jobList.Amount {
 		// iterate through them
 		for _, jobEntity := range jobList.Entities[0].Parents() {
 			// load the full job data as instance of job struct
-			newJob := job.Load(jobEntity.ID)
+			newJob := Load(jobEntity.ID, n.memory)
 			if nil != newJob {
 				// finally assign the job
-				ok := self.AssignJob(newJob)
+				ok := n.AssignJob(newJob)
 				if ok {
 					return true
 				}
@@ -100,12 +98,12 @@ func (self *Runner) FindJob() bool {
 	return false
 }
 
-func (self *Runner) ExecuteJob() ([]transport.TransportEntity, error) {
-	qry := query.New().Read("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(query.New().Read("Job").To(query.New().Read("Input")))
-	ret := self.gitsInstance.Query().Execute(qry)
+func (n *Neuron) ExecuteJob() ([]transport.TransportEntity, error) {
+	qry := query.New().Read("Neuron").Match("Value", "==", strconv.Itoa(n.id)).To(query.New().Read("Job").To(query.New().Read("Input")))
+	ret := n.memory.Gits.Query().Execute(qry)
 
 	if 0 == ret.Amount {
-		return []transport.TransportEntity{}, errors.New("Runner could not find any assigned job. This should be rather impossible")
+		return []transport.TransportEntity{}, errors.New("Neuron could not find any assigned job. This should be rather impossible")
 	}
 
 	// convert json input to actual struct instance
@@ -117,13 +115,13 @@ func (self *Runner) ExecuteJob() ([]transport.TransportEntity, error) {
 		return []transport.TransportEntity{}, err
 	}
 
-	// retrieve the action from taskRegistry and apply it
-	jobAction := self.actionRegistry[ret.Entities[0].Children()[0].Properties["Action"]]
-	archivist.Info("Runner " + strconv.Itoa(self.id) + " executing action " + jobAction.GetName() + " with Job " + ret.Entities[0].Children()[0].Value)
+	// retrieve the action from taskRegistry and apply it ### handle error
+	jobAction, _ := n.cortex.GetAction(ret.Entities[0].Children()[0].Properties["Action"])
+	archivist.Info("Neuron " + strconv.Itoa(n.id) + " executing action " + jobAction.GetName() + " with Job " + ret.Entities[0].Children()[0].Value)
 	// clear bMap properties from inputEntity, so we don't endless run
 	rRemovebMap(inputEntity)
 	// finally we execute it
-	results, err := jobAction.GetPlugin().Execute(inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Runner")
+	results, err := jobAction.GetInstance().Execute(n.memory.Gits, inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Neuron")
 	if nil != err {
 		return []transport.TransportEntity{}, errors.New("Job: " + ret.Entities[0].Children()[0].Value + " execution failed with error " + err.Error())
 	}
@@ -132,130 +130,130 @@ func (self *Runner) ExecuteJob() ([]transport.TransportEntity, error) {
 	return results, nil
 }
 
-func (self *Runner) AssignJob(newJob *job.Job) bool {
+func (n *Neuron) AssignJob(newJob *Job) bool {
 	// update runners status to Assigning...
-	self.ChangeState("Assigning")
+	n.ChangeState("Assigning")
 
 	// letes see if we can assign that job
-	ok := newJob.AssignToRunner(self.id)
+	ok := newJob.AssignToRunner(n.id)
 	if !ok {
 		// job could not be assigned, lets think about what reasons this could have
 		// for different error handlings. for now we just gonne log it
-		archivist.Debug("Runner couldnt assign job: ", newJob.Data)
+		archivist.Debug("Neuron couldnt assign job: ", newJob.GetID())
 
 		// update runners status...
-		self.ChangeState("Searching")
+		n.ChangeState("Searching")
 
 		return false
 	}
 
 	// update runners status...
-	self.ChangeState("Working")
+	n.ChangeState("Working")
 
-	// ... link the job to the runner
-	qry := query.New().Find("Runner").Match(
+	// ... link the job to the neuron
+	qry := query.New().Find("Neuron").Match(
 		"Value",
 		"==",
-		strconv.Itoa(self.id),
+		strconv.Itoa(n.id),
 	).Link("Job").Match(
 		"ID",
 		"==",
 		strconv.Itoa(newJob.GetID()),
 	)
-	self.gitsInstance.Query().Execute(qry)
+	n.memory.Gits.Query().Execute(qry)
 
-	self.job = *newJob
+	n.job = *newJob
 
 	return true
 }
 
-func (self *Runner) CheckChannel() {
+func (n *Neuron) CheckChannel() {
 
 }
 
-func (self *Runner) GetInputIntercom() chan string {
-	return self.intercom[INTERCOM_INPUT_CHAN]
+func (n *Neuron) GetInputIntercom() chan string {
+	return n.intercom[INTERCOM_INPUT_CHAN]
 }
 
-func (self *Runner) GetOutputIntercom() chan string {
-	return self.intercom[INTERCOM_OUTPUT_CHAN]
+func (n *Neuron) GetOutputIntercom() chan string {
+	return n.intercom[INTERCOM_OUTPUT_CHAN]
 }
 
-func (self *Runner) ChangeState(state string) {
-	qry := query.New().Update("Runner").Match(
+func (n *Neuron) ChangeState(state string) {
+	qry := query.New().Update("Neuron").Match(
 		"Value",
 		"==",
-		strconv.Itoa(self.id),
+		strconv.Itoa(n.id),
 	).Set(
 		"Properties.State",
 		state,
 	)
-	self.gitsInstance.Query().Execute(qry)
+	n.memory.Gits.Query().Execute(qry)
 }
 
-func (self *Runner) FinishJobSuccess(results []transport.TransportEntity) {
+func (n *Neuron) FinishJobSuccess(results []transport.TransportEntity) {
 	// going through the results
 	for _, result := range results {
 		archivist.Debug("Mapping result from job", result)
-		mappedResult := mapper.MapTransportData(result)
+		mappedResult := n.memory.Mapper.MapTransportData(result)
 		archivist.Debug("Running freshly mapped job return with scheduler", mappedResult)
-		scheduler.Run(result, self.actionRegistry)
+		n.activity.Scheduler.Run(result, n.cortex)
 	}
 
-	qry := query.New().Read("Runner").Match(
+	qry := query.New().Read("Neuron").Match(
 		"Value",
 		"==",
-		strconv.Itoa(self.id),
+		strconv.Itoa(n.id),
 	).To(query.New().Read("Job"))
 
-	runnerWithJob := self.gitsInstance.Query().Execute(qry)
+	runnerWithJob := n.memory.Gits.Query().Execute(qry)
 	jobId := runnerWithJob.Entities[0].Children()[0].ID
-	archivist.Debug("Detaching job from runner", runnerWithJob)
-	qry = query.New().Unlink("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(
+	archivist.Debug("Detaching job from neuron", runnerWithJob)
+	qry = query.New().Unlink("Neuron").Match("Value", "==", strconv.Itoa(n.id)).To(
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
-	self.gitsInstance.Query().Execute(qry)
+	n.memory.Gits.Query().Execute(qry)
 
-	self.deleteJobAndInput(jobId)
-	self.ChangeState("Searching")
+	n.deleteJobAndInput(jobId)
+	n.ChangeState("Searching")
 }
 
-func (self *Runner) FinishJobError(err error) {
+func (n *Neuron) FinishJobError(err error) {
 	archivist.Info("Ended job with error: ", err.Error())
-	qry := query.New().Read("Runner").Match(
+	qry := query.New().Read("Neuron").Match(
 		"Value",
 		"==",
-		strconv.Itoa(self.id),
+		strconv.Itoa(n.id),
 	).To(query.New().Read("Job"))
 
-	runnerWithJob := self.gitsInstance.Query().Execute(qry)
+	runnerWithJob := n.memory.Gits.Query().Execute(qry)
 	jobId := runnerWithJob.Entities[0].Children()[0].ID
-	archivist.Debug("Detaching job from runner", runnerWithJob)
-	qry = query.New().Unlink("Runner").Match("Value", "==", strconv.Itoa(self.id)).To(
+	archivist.Debug("Detaching job from neuron", runnerWithJob)
+	qry = query.New().Unlink("Neuron").Match("Value", "==", strconv.Itoa(n.id)).To(
 		query.New().Find("Job").Match("ID", "==", strconv.Itoa(jobId)),
 	)
 
-	self.gitsInstance.Query().Execute(qry)
-	self.deleteJobAndInput(jobId)
-	self.ChangeState("Searching")
+	n.memory.Gits.Query().Execute(qry)
+	n.deleteJobAndInput(jobId)
+	n.ChangeState("Searching")
 }
 
-func (self *Runner) deleteJobAndInput(jobID int) {
+func (n *Neuron) deleteJobAndInput(jobID int) {
 	jobQry := query.New().Read("Job").Match("ID", "==", strconv.Itoa(jobID)).To(
 		query.New().Read("Input"),
 	)
-	dat := self.gitsInstance.Query().Execute(jobQry)
+	dat := n.memory.Gits.Query().Execute(jobQry)
 
 	unlinkQuery := query.New().Unlink("Job").Match("Value", "==", strconv.Itoa(dat.Entities[0].ID)).To(
 		query.New().Find("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID)),
 	)
-	self.gitsInstance.Query().Execute(unlinkQuery)
+	n.memory.Gits.Query().Execute(unlinkQuery)
 
 	jobDeleteQry := query.New().Delete("Job").Match("ID", "==", strconv.Itoa(dat.Entities[0].ID))
-	self.gitsInstance.Query().Execute(jobDeleteQry)
+	n.memory.Gits.Query().Execute(jobDeleteQry)
 
 	inputDeleteQuery := query.New().Delete("Input").Match("ID", "==", strconv.Itoa(dat.Entities[0].Children()[0].ID))
-	self.gitsInstance.Query().Execute(inputDeleteQuery)
+	n.memory.Gits.Query().Execute(inputDeleteQuery)
 
 }
 

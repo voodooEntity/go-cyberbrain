@@ -1,33 +1,42 @@
-package scheduler
+package cerebrum
 
 import (
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain/src/system/demultiplexer"
-	"github.com/voodooEntity/go-cyberbrain/src/system/job"
-	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
 	"strconv"
 	"strings"
 )
 
-func Run(data transport.TransportEntity, registry registry.Registry) {
-	// first we need to demultiplex the data we just gathered.
-	// based on the results we can than identify and build new job payloads
-	demultiplexedData := demultiplexer.Parse(data)
-	archivist.Debug("Demultiplexed input", demultiplexedData)
+type Scheduler struct {
+	memory        *Memory
+	demultiplexer *Demultiplexer
+}
 
-	newRelationStructures := make(map[string][2]*transport.TransportEntity)
-	newRelationStructures = rFilterRelationStructures(data, newRelationStructures)
-
-	// build job inputs by each singleEntry of demultiplexed data
-	for _, singleData := range demultiplexedData {
-		createNewJobs(singleData, newRelationStructures, registry)
+func NewScheduler(memory *Memory, demultiplexerInstance *Demultiplexer) *Scheduler {
+	return &Scheduler{
+		memory:        memory,
+		demultiplexer: demultiplexerInstance,
 	}
 }
 
-func rFilterRelationStructures(entity transport.TransportEntity, relationStructures map[string][2]*transport.TransportEntity) map[string][2]*transport.TransportEntity {
+func (s *Scheduler) Run(data transport.TransportEntity, cortex *Cortex) {
+	// first we need to demultiplex the data we just gathered.
+	// based on the results we can than identify and build new job payloads
+	demultiplexedData := s.demultiplexer.Parse(data)
+	archivist.Debug("Demultiplexed input", demultiplexedData)
+
+	newRelationStructures := make(map[string][2]*transport.TransportEntity)
+	newRelationStructures = s.rFilterRelationStructures(data, newRelationStructures)
+
+	// build job inputs by each singleEntry of demultiplexed data
+	for _, singleData := range demultiplexedData {
+		s.createNewJobs(singleData, newRelationStructures, cortex)
+	}
+}
+
+func (s *Scheduler) rFilterRelationStructures(entity transport.TransportEntity, relationStructures map[string][2]*transport.TransportEntity) map[string][2]*transport.TransportEntity {
 	if 0 < len(entity.ChildRelations) {
 		for _, childRelation := range entity.ChildRelations {
 			if _, ok := childRelation.Properties["bMap"]; ok {
@@ -42,26 +51,26 @@ func rFilterRelationStructures(entity transport.TransportEntity, relationStructu
 					relationStructures[tmpRelString] = [2]*transport.TransportEntity{&entity, &childRelation.Target}
 				}
 			}
-			relationStructures = rFilterRelationStructures(childRelation.Target, relationStructures)
+			relationStructures = s.rFilterRelationStructures(childRelation.Target, relationStructures)
 		}
 	}
 	return relationStructures
 }
 
-func createNewJobs(entity transport.TransportEntity, newRelationStructures map[string][2]*transport.TransportEntity, registry registry.Registry) []transport.TransportEntity {
+func (s *Scheduler) createNewJobs(entity transport.TransportEntity, newRelationStructures map[string][2]*transport.TransportEntity, cortex *Cortex) []transport.TransportEntity {
 	// first we will enrich some lookup variables we need later on
 	// by recursively walking the given data
 	lookup := make(map[string]int)
 	var pointer [][]*transport.TransportEntity
 	archivist.Debug("Enrich lookup by entity", entity)
-	lookup, pointer = rEnrichLookupAndPointer(entity, lookup, pointer)
+	lookup, pointer = s.rEnrichLookupAndPointer(entity, lookup, pointer)
 	archivist.Debug("Lookup data", lookup, pointer)
 	// now we going to retrieve all action+dependency combos to that could potentially
 	// be executed based on the new learned data which we just identified and stored
 	// in our lookup/pointer variables
 	var actionsAndDependencies [][2]string
 	for entityType := range lookup {
-		actionsAndDependencies = append(actionsAndDependencies, retrieveActionsByType(entityType)...)
+		actionsAndDependencies = append(actionsAndDependencies, s.retrieveActionsByType(entityType)...)
 	}
 	archivist.Debug("Action and dependency found to input", actionsAndDependencies)
 
@@ -69,10 +78,10 @@ func createNewJobs(entity transport.TransportEntity, newRelationStructures map[s
 	if 0 < len(newRelationStructures) {
 		archivist.Debug("New relevant relation structures found in scheduler %+v", newRelationStructures)
 		archivist.Debug("actionsAndDependencies before enrichin by relation structures", actionsAndDependencies)
-		actionsAndDependencies = enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures, actionsAndDependencies)
+		actionsAndDependencies = s.enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures, actionsAndDependencies)
 		archivist.Debug("actionsAndDependencies after enrichin by relation structures", actionsAndDependencies)
 		archivist.Debug("lookupAndPointer before enrichment by relation structures", lookup, pointer)
-		lookup, pointer = enrichLookupAndPointerByRelationStructures(newRelationStructures, lookup, pointer)
+		lookup, pointer = s.enrichLookupAndPointerByRelationStructures(newRelationStructures, lookup, pointer)
 		archivist.Debug("lookupAndPointer after enrichment by relation structures", lookup, pointer)
 		archivist.Debug("lookupAndPointer input structure", entity)
 	}
@@ -82,15 +91,16 @@ func createNewJobs(entity transport.TransportEntity, newRelationStructures map[s
 	// through the dependencies and enrich an input datastructure using the given entity data and
 	// the data that is in our storage
 	for _, actionAndDependency := range actionsAndDependencies {
-		act, _ := registry.GetAction(actionAndDependency[0])
+		act, _ := cortex.GetAction(actionAndDependency[0])
 		requirement := act.GetDependencyByName(actionAndDependency[1])
 		archivist.Debug("Trying to enrich data based on ", actionAndDependency)
-		newJobInputs := buildInputData(requirement.Children()[0], lookup, pointer)
+		newJobInputs := s.buildInputData(requirement.Children()[0], lookup, pointer)
 		//inputData, err := rBuildInputData(requirement.Children()[0], entity, pointer, lookup, false, "", -1, nil)
 		if 0 < len(newJobInputs) {
 			for _, inputData := range newJobInputs {
 				archivist.Debug("Created a new job with payload", inputData)
-				job.Create(act.GetName(), actionAndDependency[1], inputData)
+				newJob := NewJob(s.memory)
+				newJob.Create(act.GetName(), actionAndDependency[1], inputData)
 			}
 		} else {
 			archivist.Debug("Requirement could not be satisfied", requirement)
@@ -100,7 +110,7 @@ func createNewJobs(entity transport.TransportEntity, newRelationStructures map[s
 	return []transport.TransportEntity{}
 }
 
-func enrichLookupAndPointerByRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) (map[string]int, [][]*transport.TransportEntity) {
+func (s *Scheduler) enrichLookupAndPointerByRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) (map[string]int, [][]*transport.TransportEntity) {
 	for _, entityPair := range newRelationStructures {
 		for _, entity := range entityPair {
 			if _, ok := lookup[entity.Type]; !ok {
@@ -113,9 +123,9 @@ func enrichLookupAndPointerByRelationStructures(newRelationStructures map[string
 	return lookup, pointer
 }
 
-func enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, actionsAndDependencies [][2]string) [][2]string {
+func (s *Scheduler) enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, actionsAndDependencies [][2]string) [][2]string {
 	for relationStructure, _ := range newRelationStructures {
-		actions := retrieveActionsByRelationStructure(relationStructure)
+		actions := s.retrieveActionsByRelationStructure(relationStructure)
 		archivist.Debug("Retrieved actions by relationStructure "+relationStructure, actions)
 		for _, action := range actions {
 			add := true
@@ -132,20 +142,20 @@ func enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures m
 	return actionsAndDependencies
 }
 
-func buildInputData(requirement transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) []transport.TransportEntity {
+func (s *Scheduler) buildInputData(requirement transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) []transport.TransportEntity {
 	newJobs := []transport.TransportEntity{}
-	qry := rBuildQuery(requirement, lookup, pointer)
+	qry := s.rBuildQuery(requirement, lookup, pointer)
 	result := gits.GetDefault().Query().Execute(qry)
 
 	if 0 < result.Amount {
 		for _, enriched := range result.Entities {
-			newJobs = append(newJobs, demultiplexer.Parse(enriched)...)
+			newJobs = append(newJobs, s.demultiplexer.Parse(enriched)...)
 		}
 	}
 	return newJobs
 }
 
-func rBuildQuery(requirement transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) *query.Query {
+func (s *Scheduler) rBuildQuery(requirement transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) *query.Query {
 	qry := query.New().Read(requirement.Value)
 	// is requirement in index we add an exact ID matching filter
 	if _, ok := lookup[requirement.Value]; ok {
@@ -155,18 +165,18 @@ func rBuildQuery(requirement transport.TransportEntity, lookup map[string]int, p
 	// if its match mode we have to apply filters
 	if requirement.Properties["Mode"] == "Match" {
 		// we add match filters
-		qry = enrichQueryFilters(qry, requirement)
+		qry = s.enrichQueryFilters(qry, requirement)
 	}
 	// any child relations?
 	if 0 < len(requirement.ChildRelations) {
 		for _, childRelation := range requirement.ChildRelations {
-			qry = qry.To(rBuildQuery(childRelation.Target, lookup, pointer))
+			qry = qry.To(s.rBuildQuery(childRelation.Target, lookup, pointer))
 		}
 	}
 	return qry
 }
 
-func enrichQueryFilters(query *query.Query, requirement transport.TransportEntity) *query.Query {
+func (s *Scheduler) enrichQueryFilters(query *query.Query, requirement transport.TransportEntity) *query.Query {
 	filters := make(map[string][]string)
 	for name, val := range requirement.Properties {
 		if len(name) > 6 && name[:6] == "Filter" {
@@ -197,7 +207,7 @@ func enrichQueryFilters(query *query.Query, requirement transport.TransportEntit
 	return query
 }
 
-func retrieveActionsByType(entityType string) [][2]string {
+func (s *Scheduler) retrieveActionsByType(entityType string) [][2]string {
 	var ret [][2]string
 	qry := query.New().Read("DependencyEntityLookup").Match("Value", "==", entityType).To(
 		query.New().Read("Dependency").From(
@@ -216,7 +226,7 @@ func retrieveActionsByType(entityType string) [][2]string {
 	return ret
 }
 
-func retrieveActionsByRelationStructure(relationStructure string) [][2]string {
+func (s *Scheduler) retrieveActionsByRelationStructure(relationStructure string) [][2]string {
 	var ret [][2]string
 	qry := query.New().Read("DependencyRelationLookup").Match("Value", "==", relationStructure).To(
 		query.New().Read("Dependency").From(
@@ -235,7 +245,7 @@ func retrieveActionsByRelationStructure(relationStructure string) [][2]string {
 	return ret
 }
 
-func rEnrichLookupAndPointer(entity transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) (map[string]int, [][]*transport.TransportEntity) {
+func (s *Scheduler) rEnrichLookupAndPointer(entity transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) (map[string]int, [][]*transport.TransportEntity) {
 	archivist.Debug("Enrichting step", entity)
 	// lets see if this is newly learned data
 	if _, ok := entity.Properties["bMap"]; ok {
@@ -255,7 +265,7 @@ func rEnrichLookupAndPointer(entity transport.TransportEntity, lookup map[string
 		}
 	}
 	for _, childRelation := range entity.ChildRelations {
-		lookup, pointer = rEnrichLookupAndPointer(childRelation.Target, lookup, pointer)
+		lookup, pointer = s.rEnrichLookupAndPointer(childRelation.Target, lookup, pointer)
 	}
 	//for _, parentRelation := range entity.ParentRelations { // ### enrichment towards parents is disabled for now
 	//	lookup, pointer = rEnrichLookupAndPointer(parentRelation.Target, lookup, pointer)

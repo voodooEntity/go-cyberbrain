@@ -1,18 +1,19 @@
-package action
+package cerebrum
 
 import (
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain-plugin-interface/src/interfaces"
+	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 )
 
 type Action struct {
 	name         string
 	categories   []transport.TransportEntity
 	dependencies []transport.TransportEntity
-	plugin       interfaces.PluginInterface
+	instance     interfaces.ActionInterface
+	factory      func() interfaces.ActionInterface
 }
 
-func New() *Action {
+func NewAction() *Action {
 	return &Action{}
 }
 
@@ -43,22 +44,28 @@ func (self *Action) GetDependencyByName(name string) transport.TransportEntity {
 	return transport.TransportEntity{}
 }
 
-func (self *Action) SetPlugin(plugin interfaces.PluginInterface) *Action {
-	self.plugin = plugin
+func (self *Action) SetInstance(instance interfaces.ActionInterface) *Action {
+	self.instance = instance
 	return self
 }
-func (self *Action) GetPlugin() interfaces.PluginInterface {
-	return self.plugin
+func (self *Action) GetInstance() interfaces.ActionInterface {
+	return self.instance
 }
 
-func (self *Action) GetInstance() interfaces.PluginInterface {
-	return self.GetPlugin().New()
+func (self *Action) CreateInstance() interfaces.ActionInterface {
+	return self.factory()
 }
 
 func (self *Action) SetCategories(categories []transport.TransportEntity) *Action {
 	self.categories = categories
 	return self
 }
+
 func (self *Action) GetCategories() []transport.TransportEntity {
 	return self.categories
+}
+
+func (self *Action) SetFactory(f func() interfaces.ActionInterface) *Action {
+	self.factory = f
+	return self
 }
