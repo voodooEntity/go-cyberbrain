@@ -1,13 +1,9 @@
-package go_cyberbrain
+package cyberbrain
 
 import (
 	"errors"
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/gitsapi"
-	gitsapiConfig "github.com/voodooEntity/gitsapi/src/config"
-	"github.com/voodooEntity/go-cyberbrain/src/system/api"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"github.com/voodooEntity/go-cyberbrain/src/system/observer"
@@ -181,16 +177,16 @@ func (cb *Cyberbrain) GetObserverInstance(callback func(memoryInstance *cerebrum
 	return observer.New(cb.con.Memory, cb.neuronAmount, callback, lethal)
 }
 
-func (cb *Cyberbrain) StartContinouus() {
-	gitsapiConfig.Init(map[string]string{})
-
-	// init the archivist logger ### maybe will access a different config later on
-	// prolly should access the one of bezel not the gitsapi one. for now, we gonne stick with it ###
-	archivist.Init(gitsapiConfig.GetValue("LOG_LEVEL"), gitsapiConfig.GetValue("LOG_TARGET"), gitsapiConfig.GetValue("LOG_PATH"))
-
-	// initing some additional application specific endpoints
-	api.Extend()
-
-	// start the actual gitsapi
-	gitsapi.Start()
-}
+//func (cb *Cyberbrain) StartContinouus() {
+//	gitsapiConfig.Init(map[string]string{})
+//
+//	// init the archivist logger ### maybe will access a different config later on
+//	// prolly should access the one of bezel not the gitsapi one. for now, we gonne stick with it ###
+//	archivist.Init(gitsapiConfig.GetValue("LOG_LEVEL"), gitsapiConfig.GetValue("LOG_TARGET"), gitsapiConfig.GetValue("LOG_PATH"))
+//
+//	// initing some additional application specific endpoints
+//	api.Extend()
+//
+//	// start the actual gitsapi
+//	gitsapi.Start()
+//}

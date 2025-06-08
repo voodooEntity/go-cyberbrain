@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/voodooEntity/gits/src/storage"
 	"github.com/voodooEntity/gits/src/transport"
-	cyberbrain "github.com/voodooEntity/go-cyberbrain"
+	"github.com/voodooEntity/go-cyberbrain"
 	"github.com/voodooEntity/go-cyberbrain/src/example"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
