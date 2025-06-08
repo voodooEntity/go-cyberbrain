@@ -5,9 +5,9 @@ import (
 	"github.com/voodooEntity/gits/src/storage"
 	"github.com/voodooEntity/gits/src/transport"
 	cyberbrain "github.com/voodooEntity/go-cyberbrain"
+	"github.com/voodooEntity/go-cyberbrain/src/example"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
-	"github.com/voodooEntity/go-cyberbrain/src/test"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 		Ident:        "GreatName",
 	})
 	cb.RegisterAction("resolveIPFromDomain", func() interfaces.ActionInterface {
-		return test.New()
+		return example.New()
 	})
 	cb.Start()
 
