@@ -1,23 +1,20 @@
 package observer
 
 import (
-	"encoding/json"
 	"github.com/voodooEntity/archivist"
-	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
-	"github.com/voodooEntity/go-cyberbrain/src/system/core"
-	"github.com/voodooEntity/go-cyberbrain/src/system/job"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
-	"strconv"
 	"time"
 )
 
 type Observer struct {
-	RootType          string
-	RootID            int
 	InactiveIncrement int
-	gitsInstance      *gits.Gits
+	memory            *cerebrum.Memory
+	runnerAmount      int
+	callback          func(memoryInstance *cerebrum.Memory)
 	Runners           []Tracker
+	lethal            bool
 }
 
 type Tracker struct {
@@ -25,12 +22,11 @@ type Tracker struct {
 	Version int
 }
 
-func New(rootType string, rootID int) *Observer {
+func New(memoryInstance *cerebrum.Memory, runnerAmount int, cb func(memoryInstance *cerebrum.Memory), lethal bool) *Observer {
 	archivist.Info("Creating observer")
-	gi := gits.GetDefault()
 	var runners []Tracker
-	qry := query.New().Read("Runner")
-	res := gi.Query().Execute(qry)
+	qry := query.New().Read("Neuron")
+	res := memoryInstance.Gits.Query().Execute(qry)
 	for _, val := range res.Entities {
 		runners = append(runners, Tracker{
 			ID:      val.ID,
@@ -39,75 +35,73 @@ func New(rootType string, rootID int) *Observer {
 	}
 
 	return &Observer{
-		RootType:          rootType,
-		RootID:            rootID,
 		InactiveIncrement: 0,
-		gitsInstance:      gi,
+		memory:            memoryInstance,
 		Runners:           runners,
+		callback:          cb,
+		runnerAmount:      runnerAmount,
+		lethal:            lethal,
 	}
 }
 
-func (self *Observer) Loop() {
-	for !self.ReachedEndgame() {
+func (o *Observer) Loop() {
+	for !o.ReachedEndgame() {
 		archivist.Debug("Observer looping:")
 		time.Sleep(100 * time.Millisecond)
 	}
-	self.Endgame()
-	archivist.Info("Cyberbrain has been shutdown, runner exiting")
+	o.Endgame()
+	archivist.Info("Cyberbrain has been shutdown, neuron exiting")
 }
 
-func (self *Observer) ReachedEndgame() bool {
-	runnerQry := query.New().Read("Runner").Match("Properties.State", "==", "Searching")
-	sysRunners := self.gitsInstance.Query().Execute(runnerQry)
-	archivist.Debug("Observer: searching runners", sysRunners.Amount)
-	archivist.Debug("Observer: total amount created runners", len(core.Runners))
-	openJobs := job.GetOpenJobs()
-	if openJobs.Amount == 0 && sysRunners.Amount == len(core.Runners) {
+func (o *Observer) ReachedEndgame() bool {
+	runnerQry := query.New().Read("Neuron").Match("Properties.State", "==", "Searching")
+	sysRunners := o.memory.Gits.Query().Execute(runnerQry)
+	archivist.Debug("Observer: searching neurons", sysRunners.Amount)
+	archivist.Debug("Observer: total amount created neurons", o.runnerAmount)
+	openJobs := cerebrum.GetOpenJobs(o.memory.Gits)
+	if openJobs.Amount == 0 && sysRunners.Amount == o.runnerAmount {
 		changedVersion := false
 		for _, sysRunner := range sysRunners.Entities {
-			for tid, tracker := range self.Runners {
+			for tid, tracker := range o.Runners {
 				if sysRunner.ID == tracker.ID {
 					if sysRunner.Version != tracker.Version {
 						changedVersion = true
-						self.Runners[tid].Version = sysRunner.Version
+						o.Runners[tid].Version = sysRunner.Version
 					}
 				}
 			}
 		}
 		if changedVersion {
-			self.InactiveIncrement = 0
+			o.InactiveIncrement = 0
 			return false
 		}
-		if self.InactiveIncrement > 5 {
+		if o.InactiveIncrement > 5 {
 			return true
 		}
-		self.InactiveIncrement++
+		o.InactiveIncrement++
 		return false
 	}
-	self.InactiveIncrement = 0
+	o.InactiveIncrement = 0
 	return false
 }
 
-func (self *Observer) Endgame() {
+func (o *Observer) Endgame() {
 	archivist.Info("executing endgame")
-	util.Shutdown()
-	for !self.AllRunnersDead() {
-		time.Sleep(10 * time.Millisecond)
+	// if we are lethal we gonne stop cyberbrain
+	if o.lethal {
+		util.Shutdown()
+		for !o.AllRunnersDead() {
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
-	finalDataQuery := query.New().Read(self.RootType).Match("ID", "==", strconv.Itoa(self.RootID)).TraverseOut(100).TraverseIn(100)
-	finalData := self.gitsInstance.Query().Execute(finalDataQuery)
-	b, err := json.Marshal(finalData)
-	if err != nil {
-		archivist.Error("Error marshalling final data", err)
-		return
-	}
-	archivist.Info("Result " + string(b))
+	// execute callback with memory instance provided
+	o.callback(o.memory)
 }
 
-func (self *Observer) AllRunnersDead() bool {
-	qry := query.New().Read("Runner").Match("Properties.State", "==", "Dead")
-	runners := self.gitsInstance.Query().Execute(qry)
-	if runners.Amount == len(core.Runners) {
+func (o *Observer) AllRunnersDead() bool {
+	qry := query.New().Read("Neuron").Match("Properties.State", "==", "Dead")
+	runners := o.memory.Gits.Query().Execute(qry)
+	if runners.Amount == o.runnerAmount {
 		return true
 	}
 	return false

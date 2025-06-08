@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum/activity/scheduler"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cortex"
 	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
 	"github.com/voodooEntity/go-cyberbrain/src/system/observer"
-	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
-	"github.com/voodooEntity/go-cyberbrain/src/system/scheduler"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -17,7 +17,6 @@ import (
 	gitsapiConfig "github.com/voodooEntity/gitsapi/src/config"
 	"github.com/voodooEntity/go-cyberbrain/src/system/api"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cli"
-	"github.com/voodooEntity/go-cyberbrain/src/system/core"
 	"github.com/voodooEntity/go-cyberbrain/src/system/pluginBuilder"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
@@ -75,8 +74,8 @@ func run() {
 		gitsCfg["LOG_LEVEL"] = "debug"
 	}
 
-	// than we init the core
-	core.Init(gitsapiConfig.Data)
+	// than we init the cortex
+	cortex.Init(gitsapiConfig.Data)
 
 	switch mode := cli.Data.Mode; mode {
 	case cli.RUN_MODE_CONTINOUUS:
@@ -105,7 +104,7 @@ func startOneshot() {
 	mappedData := mapper.MapTransportDataWithContext(transportData, "Data")
 	rootType := mappedData.Type
 	rootID := mappedData.ID
-	scheduler.Run(mappedData, registry.Data)
+	scheduler.Run(mappedData, cortex.Data)
 
 	obs := observer.New(rootType, rootID)
 	obs.Loop()

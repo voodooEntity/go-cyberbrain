@@ -6,9 +6,9 @@ import (
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/gitsapi"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum/activity/scheduler"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cortex"
 	"github.com/voodooEntity/go-cyberbrain/src/system/mapper"
-	"github.com/voodooEntity/go-cyberbrain/src/system/registry"
-	"github.com/voodooEntity/go-cyberbrain/src/system/scheduler"
 	"io/ioutil"
 	"net/http"
 )
@@ -49,7 +49,7 @@ func Extend() {
 		// lets pass the body to our mapper
 		// that will recursive map the entities
 		mappedData := mapper.MapTransportDataWithContext(transportData, "Data")
-		scheduler.Run(mappedData, registry.Data)
+		scheduler.Run(mappedData, cortex.Data)
 		if nil != err {
 			http.Error(w, err.Error(), 422)
 			return
