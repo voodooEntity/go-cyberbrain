@@ -1,30 +1,48 @@
 package example
 
 import (
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
+	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"net"
 	"strconv"
 	"time"
 )
 
 type Example struct {
-	Gits *gits.Gits
+	Gits   *gits.Gits
+	Mapper *cerebrum.Mapper
+}
+
+func New() *Example {
+	tmp := &Example{}
+	return tmp
+}
+
+func (self *Example) SetGits(gitsInstance *gits.Gits) {
+	self.Gits = gitsInstance
+}
+
+func (self *Example) SetMapper(mapper *cerebrum.Mapper) {
+	self.Mapper = mapper
 }
 
 // Execute method mandatory
 func (self *Example) Execute(input transport.TransportEntity, requirement string, context string) ([]transport.TransportEntity, error) {
-	archivist.DebugF("Plugin executed with input %+v", input)
+
+	// resolve the ip
 	ips, err := net.LookupIP(input.Value)
 	if nil != err {
+		// if there was en error, return no data and the error
 		return []transport.TransportEntity{}, err
 	}
+
+	// for each IP resolved
 	for _, ip := range ips {
+		// for this example we only handle v4
 		if ipv4 := ip.To4(); ipv4 != nil {
-			archivist.Debug("ipv4 ", ipv4)
-			// if we find an IPv4 we create a parental entity IP that links to our input domain dataset and return it for further processing
+			// we enhance the input which provided the domain by the IP as child relation.
+			// we use -2 flag to map (By Type and Value and Parent) ### add constants for this
 			input.ChildRelations = append(input.ChildRelations, transport.TransportRelation{
 				Target: transport.TransportEntity{
 					ID:         -2,
@@ -35,7 +53,13 @@ func (self *Example) Execute(input transport.TransportEntity, requirement string
 				}})
 		}
 	}
+	// make sure properties is well formed. this could be solved
+	// better ###
 	input.Properties = make(map[string]string)
+
+	// now we return the enriched input data
+	// which will automatically be mapped onto
+	// the existing domain
 	return []transport.TransportEntity{input}, nil
 }
 
@@ -77,14 +101,4 @@ func (self *Example) GetConfig() transport.TransportEntity {
 			},
 		},
 	}
-}
-
-func (self *Example) SetGits(gitsInstance *gits.Gits) interfaces.ActionInterface {
-	self.Gits = gitsInstance
-	return self
-}
-
-func New() *Example {
-	tmp := &Example{}
-	return tmp
 }
