@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/voodooEntity/archivist"
+	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
@@ -28,6 +29,17 @@ type Neuron struct {
 	activity *Activity
 }
 
+//   - - - - - - - - - - - - - - - - - - - - - -
+//     Placed here to prevent cyclic import
+//   - - - - - - - - - - - - - - - - - - - - - -
+type ActionExtendGitsInterface interface {
+	SetGits(*gits.Gits)
+}
+
+type ActionExtendMapperInterface interface {
+	SetMapper(*Mapper)
+}
+
 func NewNeuron(id int, cortexInstance *Cortex, memoryInstance *Memory, activityInstance *Activity) *Neuron {
 	archivist.Info("Creating neuron", id)
 	properties := make(map[string]string)
@@ -50,7 +62,7 @@ func NewNeuron(id int, cortexInstance *Cortex, memoryInstance *Memory, activityI
 }
 
 func (n *Neuron) Loop() {
-	for util.IsActive() {
+	for util.IsAlive(n.memory.Gits) {
 		archivist.Debug("Neuron looping id: ", n.id)
 		// lets try to assign a job
 		if n.FindJob() {
@@ -118,15 +130,30 @@ func (n *Neuron) ExecuteJob() ([]transport.TransportEntity, error) {
 	// retrieve the action from taskRegistry and apply it ### handle error
 	jobAction, _ := n.cortex.GetAction(ret.Entities[0].Children()[0].Properties["Action"])
 	archivist.Info("Neuron " + strconv.Itoa(n.id) + " executing action " + jobAction.GetName() + " with Job " + ret.Entities[0].Children()[0].Value)
+
 	// clear bMap properties from inputEntity, so we don't endless run
 	rRemovebMap(inputEntity)
-	// finally we execute it
-	results, err := jobAction.GetInstance().Execute(n.memory.Gits, inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Neuron")
+
+	// retrieve an instance of the jobs action
+	actionInstance := jobAction.GetInstance()
+
+	// Check if the action accepts a Gits client
+	if gitsSetter, ok := actionInstance.(ActionExtendGitsInterface); ok {
+		gitsSetter.SetGits(n.memory.Gits)
+	}
+
+	// Check if the action accepts a Mapper
+	if mapperSetter, ok := actionInstance.(ActionExtendMapperInterface); ok {
+		mapperSetter.SetMapper(n.memory.Mapper)
+	}
+
+	// and finally execute it
+	results, err := actionInstance.Execute(inputEntity, ret.Entities[0].Children()[0].Properties["Requirement"], "Neuron")
 	if nil != err {
 		return []transport.TransportEntity{}, errors.New("Job: " + ret.Entities[0].Children()[0].Value + " execution failed with error " + err.Error())
 	}
 	archivist.Info("Job: " + ret.Entities[0].Children()[0].Value + " finished successfully")
-	//archivist.Debug("Job result", results)
+
 	return results, nil
 }
 

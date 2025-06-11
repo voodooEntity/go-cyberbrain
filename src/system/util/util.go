@@ -3,51 +3,14 @@ package util
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
-	"github.com/voodooEntity/archivist"
+	"fmt"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain-plugin-interface/src/interfaces"
-	"os"
-	"path/filepath"
-	"plugin"
-	"strings"
+	"reflect"
 )
 
-func GetAvailablePlugins(pluginsDir string) []string {
-	dirs, err := DirectoryWalkMatch(pluginsDir, "*.so")
-	if err != nil {
-		archivist.Fatal("Could not read given plugin directory ", pluginsDir)
-		os.Exit(0)
-	}
-	var ret []string
-	for _, f := range dirs {
-		ret = append(ret, strings.TrimPrefix(f, pluginsDir))
-	}
-	return ret
-}
-
-func LoadPlugin(pluginDirectory string, plug string) (interfaces.PluginInterface, error) {
-	plugInst, err := plugin.Open(pluginDirectory + plug)
-	if err != nil {
-		return nil, errors.New("Could not load plugin '" + plug + "' with error: " + err.Error())
-	} else {
-		sym, err := plugInst.Lookup("Export")
-		if err != nil {
-			return nil, errors.New("Plugin '" + plug + "' doesnt export neccesary Export var with error: " + err.Error())
-		} else {
-			typedSymbol, ok := sym.(interfaces.PluginInterface)
-			if !ok {
-				return nil, errors.New("Plugin '" + plug + "' does not match the Plugin interfaces of bezel ")
-			} else {
-				return typedSymbol.New(), nil
-			}
-		}
-	}
-}
-
-func IsActive() bool {
+func IsAlive(gitsInstance *gits.Gits) bool {
 	qry := query.New().Read("AI").Match(
 		"Value",
 		"==",
@@ -57,14 +20,14 @@ func IsActive() bool {
 		"==",
 		"Alive",
 	)
-	ret := gits.GetDefault().Query().Execute(qry)
+	ret := gitsInstance.Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}
 	return false
 }
 
-func Shutdown() bool {
+func Terminate(gitsInstance *gits.Gits) bool {
 	qry := query.New().Update("AI").Match(
 		"Value",
 		"==",
@@ -73,33 +36,11 @@ func Shutdown() bool {
 		"Properties.State",
 		"Dead",
 	)
-	ret := gits.GetDefault().Query().Execute(qry)
+	ret := gitsInstance.Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}
 	return false
-}
-
-func DirectoryWalkMatch(root, pattern string) ([]string, error) {
-	var matches []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if matched, err := filepath.Match(pattern, filepath.Base(path)); err != nil {
-			return err
-		} else if matched || "*" == pattern {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return matches, nil
 }
 
 func StringInArray(haystack []string, needle string) bool {
@@ -148,4 +89,54 @@ func ResolveEntityField(entity transport.TransportEntity, field string) string {
 		}
 	}
 	return ""
+}
+
+// ### keep for no for debug reasons
+func structHasMethod(v interface{}, methodName string) bool {
+	// Get the reflect.Value of the instance.
+	// We need to ensure we're working with the addressable value if the methods
+	// are defined on pointer receivers (which is common for structs that hold state).
+	val := reflect.ValueOf(v)
+
+	// If the value is a pointer, get the element it points to.
+	// This handles cases where 'v' is already a pointer (e.g., *MyAction).
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	// If after dereferencing, it's still not a struct or valid value, return false.
+	// This catches cases where 'v' might be nil or a basic type.
+	if !val.IsValid() {
+		return false
+	}
+
+	// If the methods are defined on a pointer receiver (e.g., func (m *MyAction) SetData(...)),
+	// and 'val' is currently the struct value, we need to get its address.
+	// MethodByName will only find methods on the exact type it's reflecting upon.
+	// If the original 'v' was a value type and its methods are on a pointer receiver,
+	// we need to get the address of 'val' to find those methods.
+	if val.Kind() == reflect.Struct && !val.CanAddr() {
+		// If it's a struct and not addressable, we can't get a pointer to it for method lookup.
+		// This scenario means 'v' was passed as a value, and its methods are on a pointer receiver.
+		// To fix this, you would typically pass the *address* of the struct (e.g., &myInstance)
+		// to `HasMethod` initially. For the purpose of this function, if it's not addressable,
+		// we cannot proceed to find pointer receiver methods.
+		fmt.Printf("Warning: Passed value of type %T is not addressable; cannot find methods on pointer receivers.\n", v)
+		return false
+	}
+
+	// Get the method by its name.
+	// If the concrete methods are defined on pointer receivers, val needs to be addressable.
+	// For instance, if SetData is func (m *MyAction) SetData(...), then `reflect.ValueOf(myActionInstance).MethodByName("SetData")`
+	// won't find it if `myActionInstance` is a value, but `reflect.ValueOf(&myActionInstance).MethodByName("SetData")` will.
+	// By using `val.Addr()` if `val` is a struct and `val.CanAddr()`, we ensure we're looking on the pointer type if applicable.
+	var method reflect.Value
+	if val.Kind() == reflect.Struct && val.CanAddr() {
+		method = val.Addr().MethodByName(methodName)
+	} else {
+		method = val.MethodByName(methodName)
+	}
+
+	// Check if the method was found and is valid.
+	return method.IsValid()
 }

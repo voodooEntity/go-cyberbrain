@@ -89,8 +89,8 @@ func (o *Observer) Endgame() {
 	archivist.Info("executing endgame")
 	// if we are lethal we gonne stop cyberbrain
 	if o.lethal {
-		util.Shutdown()
-		for !o.AllRunnersDead() {
+		util.Terminate(o.memory.Gits)
+		for !o.AllNeuronDead() {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
@@ -98,7 +98,7 @@ func (o *Observer) Endgame() {
 	o.callback(o.memory)
 }
 
-func (o *Observer) AllRunnersDead() bool {
+func (o *Observer) AllNeuronDead() bool {
 	qry := query.New().Read("Neuron").Match("Properties.State", "==", "Dead")
 	runners := o.memory.Gits.Query().Execute(qry)
 	if runners.Amount == o.runnerAmount {

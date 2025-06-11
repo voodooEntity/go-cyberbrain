@@ -2,22 +2,23 @@ package cyberbrain
 
 import (
 	"errors"
+	"fmt"
+	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"github.com/voodooEntity/go-cyberbrain/src/system/observer"
+	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 	"runtime"
 )
 
 type Cyberbrain struct {
 	ident        string
 	neuronAmount int
-	isRunning    bool
 	neurons      []int
 	con          cerebrum.Consciousness
 	initCfg      Settings
-	//observer *observer.Observer
 }
 
 type Settings struct {
@@ -27,10 +28,15 @@ type Settings struct {
 }
 
 func New(cfg Settings) *Cyberbrain {
+	// ident is required
+	if cfg.Ident == "" {
+		archivist.Error("no ident given")
+		return nil
+	}
+
 	// setup the instance
 	instance := &Cyberbrain{
 		ident:        cfg.Ident,
-		isRunning:    false,
 		con:          cerebrum.Consciousness{},
 		neuronAmount: runtime.NumCPU(), // default neuron amount is num logical cpus
 		neurons:      make([]int, 0),
@@ -59,6 +65,10 @@ func New(cfg Settings) *Cyberbrain {
 	return instance
 }
 
+//   - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//     PUBLIC FUNCTIONS
+//   - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 func (cb *Cyberbrain) GetGitsInstance() *gits.Gits {
 	return cb.con.Memory.Gits
 }
@@ -66,10 +76,9 @@ func (cb *Cyberbrain) GetGitsInstance() *gits.Gits {
 func (cb *Cyberbrain) Start() error {
 	// make sure we dont start the same
 	// cyberbrain instance twice
-	if cb.isRunning {
+	if util.IsAlive(cb.con.Memory.Gits) {
 		return errors.New("cyberbrain already running")
 	}
-	cb.isRunning = true
 
 	// set the "alife" dataset
 	cb.bringToLife()
@@ -80,29 +89,66 @@ func (cb *Cyberbrain) Start() error {
 	return nil
 }
 
+func (cb *Cyberbrain) Stop() error {
+	if !util.IsAlive(cb.con.Memory.Gits) {
+		return errors.New("can't stop not running cyberebrain")
+	}
+
+	util.Terminate(cb.con.Memory.Gits)
+
+	return nil
+}
+
 func (cb *Cyberbrain) RegisterAction(actionName string, actionFactory func() interfaces.ActionInterface) error {
-	if cb.isRunning == true {
-		return errors.New("cyberbrain already running, cant create new actions")
+	if util.IsAlive(cb.con.Memory.Gits) {
+		return errors.New("cyberbrain already running, can't register new actions")
 	}
 	cb.con.Cortex.RegisterAction(actionName, actionFactory)
 	return nil
 }
 
-func (cb *Cyberbrain) LearnAndSchedule(data transport.TransportEntity) transport.TransportEntity {
-	learnedData := cb.Learn(data)
+func (cb *Cyberbrain) LearnAndSchedule(data transport.TransportEntity) (transport.TransportEntity, error) {
+	if !util.IsAlive(cb.con.Memory.Gits) {
+		return transport.TransportEntity{}, errors.New("cyberbrain not running")
+	}
+
+	// than we learn and schedule
+	learnedData, err := cb.Learn(data)
+	if err != nil {
+		return transport.TransportEntity{}, err
+	}
+
 	cb.Schedule(learnedData)
-	return learnedData
+
+	// return the mapped data
+	return learnedData, nil
 }
 
-func (cb *Cyberbrain) Learn(data transport.TransportEntity) transport.TransportEntity {
+func (cb *Cyberbrain) Learn(data transport.TransportEntity) (transport.TransportEntity, error) {
+	if !util.IsAlive(cb.con.Memory.Gits) {
+		return transport.TransportEntity{}, errors.New("cyberbrain not running")
+	}
+
 	// store the new data
-	return cb.con.Memory.Mapper.MapTransportDataWithContext(data, "Data")
+	return cb.con.Memory.Mapper.MapTransportDataWithContext(data, "Data"), nil
 }
 
-func (cb *Cyberbrain) Schedule(data transport.TransportEntity) {
+func (cb *Cyberbrain) Schedule(data transport.TransportEntity) error {
+	if !util.IsAlive(cb.con.Memory.Gits) {
+		return errors.New("cyberbrain not running")
+	}
+
 	cb.con.Activity.Scheduler.Run(data, cb.con.Cortex)
+	return nil
 }
 
+func (cb *Cyberbrain) GetObserverInstance(callback func(memoryInstance *cerebrum.Memory), lethal bool) *observer.Observer {
+	return observer.New(cb.con.Memory, cb.neuronAmount, callback, lethal)
+}
+
+//   - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//     INTERNAL FUNCTIONS
+//   - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 func (cb *Cyberbrain) setupActivity() {
 	activities := cerebrum.Activity{}
 
@@ -144,6 +190,7 @@ func (cb *Cyberbrain) startNeurons() {
 }
 
 func (cb *Cyberbrain) bringToLife() {
+	fmt.Print("yes we get here")
 	properties := make(map[string]string)
 	properties["State"] = "Alive"
 	cb.con.Memory.Mapper.MapTransportData(transport.TransportEntity{
@@ -172,21 +219,3 @@ func (cb *Cyberbrain) createNecessaryEntities() {
 		Properties: make(map[string]string),
 	})
 }
-
-func (cb *Cyberbrain) GetObserverInstance(callback func(memoryInstance *cerebrum.Memory), lethal bool) *observer.Observer {
-	return observer.New(cb.con.Memory, cb.neuronAmount, callback, lethal)
-}
-
-//func (cb *Cyberbrain) StartContinouus() {
-//	gitsapiConfig.Init(map[string]string{})
-//
-//	// init the archivist logger ### maybe will access a different config later on
-//	// prolly should access the one of bezel not the gitsapi one. for now, we gonne stick with it ###
-//	archivist.Init(gitsapiConfig.GetValue("LOG_LEVEL"), gitsapiConfig.GetValue("LOG_TARGET"), gitsapiConfig.GetValue("LOG_PATH"))
-//
-//	// initing some additional application specific endpoints
-//	api.Extend()
-//
-//	// start the actual gitsapi
-//	gitsapi.Start()
-//}
