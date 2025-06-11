@@ -6,6 +6,7 @@ import (
 )
 
 type ActionInterface interface {
-	Execute(*gits.Gits, transport.TransportEntity, string, string) ([]transport.TransportEntity, error)
+	Execute(transport.TransportEntity, string, string) ([]transport.TransportEntity, error)
+	SetGits(*gits.Gits) ActionInterface
 	GetConfig() transport.TransportEntity
 }

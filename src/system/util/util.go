@@ -3,51 +3,12 @@ package util
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
-	"github.com/voodooEntity/go-cyberbrain-plugin-interface/src/interfaces"
-	"os"
-	"path/filepath"
-	"plugin"
-	"strings"
 )
 
-func GetAvailablePlugins(pluginsDir string) []string {
-	dirs, err := DirectoryWalkMatch(pluginsDir, "*.so")
-	if err != nil {
-		archivist.Fatal("Could not read given plugin directory ", pluginsDir)
-		os.Exit(0)
-	}
-	var ret []string
-	for _, f := range dirs {
-		ret = append(ret, strings.TrimPrefix(f, pluginsDir))
-	}
-	return ret
-}
-
-func LoadPlugin(pluginDirectory string, plug string) (interfaces.PluginInterface, error) {
-	plugInst, err := plugin.Open(pluginDirectory + plug)
-	if err != nil {
-		return nil, errors.New("Could not load plugin '" + plug + "' with error: " + err.Error())
-	} else {
-		sym, err := plugInst.Lookup("Export")
-		if err != nil {
-			return nil, errors.New("Plugin '" + plug + "' doesnt export neccesary Export var with error: " + err.Error())
-		} else {
-			typedSymbol, ok := sym.(interfaces.PluginInterface)
-			if !ok {
-				return nil, errors.New("Plugin '" + plug + "' does not match the Plugin interfaces of bezel ")
-			} else {
-				return typedSymbol.New(), nil
-			}
-		}
-	}
-}
-
-func IsActive() bool {
+func IsAlive(gitsInstance *gits.Gits) bool {
 	qry := query.New().Read("AI").Match(
 		"Value",
 		"==",
@@ -57,14 +18,14 @@ func IsActive() bool {
 		"==",
 		"Alive",
 	)
-	ret := gits.GetDefault().Query().Execute(qry)
+	ret := gitsInstance.Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}
 	return false
 }
 
-func Shutdown() bool {
+func Terminate(gitsInstance *gits.Gits) bool {
 	qry := query.New().Update("AI").Match(
 		"Value",
 		"==",
@@ -73,33 +34,11 @@ func Shutdown() bool {
 		"Properties.State",
 		"Dead",
 	)
-	ret := gits.GetDefault().Query().Execute(qry)
+	ret := gitsInstance.Query().Execute(qry)
 	if 0 < ret.Amount {
 		return true
 	}
 	return false
-}
-
-func DirectoryWalkMatch(root, pattern string) ([]string, error) {
-	var matches []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if matched, err := filepath.Match(pattern, filepath.Base(path)); err != nil {
-			return err
-		} else if matched || "*" == pattern {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return matches, nil
 }
 
 func StringInArray(haystack []string, needle string) bool {

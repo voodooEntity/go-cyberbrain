@@ -4,16 +4,18 @@ import (
 	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
+	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"net"
 	"strconv"
 	"time"
 )
 
 type Example struct {
+	Gits *gits.Gits
 }
 
 // Execute method mandatory
-func (self *Example) Execute(gitsInstance *gits.Gits, input transport.TransportEntity, requirement string, context string) ([]transport.TransportEntity, error) {
+func (self *Example) Execute(input transport.TransportEntity, requirement string, context string) ([]transport.TransportEntity, error) {
 	archivist.DebugF("Plugin executed with input %+v", input)
 	ips, err := net.LookupIP(input.Value)
 	if nil != err {
@@ -75,6 +77,11 @@ func (self *Example) GetConfig() transport.TransportEntity {
 			},
 		},
 	}
+}
+
+func (self *Example) SetGits(gitsInstance *gits.Gits) interfaces.ActionInterface {
+	self.Gits = gitsInstance
+	return self
 }
 
 func New() *Example {
