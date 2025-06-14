@@ -1,46 +1,59 @@
-# IMPORTANT NOTE
-go-cyberbrain at this moment is in a pre-alpha experimental state. Im right now working on the docs because without them its quite impossible to dive into it. I will add more documentations in the as soon as possible, but due to limited time i can spend on this project i can't provide a final date. 
+## `go-cyberbrain`
 
-Im happy if you're interested in the topic and may revisit the project later.
+A reactive, graph-driven system for knowledge processing and automated task execution.
 
-voodooEntity aka laughingman
+---
 
----------------
+### Documentation
 
-## go-cyberbrain
+* [Getting Started](docs/GETTING_STARTED.md)
+* [Core Concepts & Architecture](docs/CONCEPTS.md)
+* [Developing Custom Actions](docs/ACTIONS.md)
 
-go-cyberbrain is an architectural framework for building data driven applications. It provides a solid foundation that allows developers to effortlessly construct applications by creating custom plugins which define the capabilities of the application based on to their specific requirements.
+---
 
-**Note:** go-cyberbrain is currently in the early alpha state and should be considered more experimental than production-ready. While it showcases the idea of the architecture, further development is underway to reach a production-ready state.
+### What is `go-cyberbrain`?
 
-### Features
+`go-cyberbrain` is a Go-based framework designed to manage and process information as a **knowledge graph**. It uses a decentralized approach to identify new data, apply defined **Actions**, and continuously expand its understanding or perform tasks. The system is designed for scenarios where data relationships are key, and automated responses to new information are required.
 
-- Lightweight and optimized: go-cyberbrain is built using mostly standard Go libraries, ensuring a streamlined development experience without the need for third-party dependencies other than created the same developers.
-- Self-supervising and orchestrating: With go-cyberbrain, the architecture takes charge of managing the workload and scheduling, allowing developers to focus on developing plugins and enhancing the application's functionality.
-- Extensibility through plugins: Plugins define the specific requirements and behavior of the application. By developing custom plugins, developers can define and extend go-cyberbrain's capabilities and tailor the application to their needs.
-- Data-driven processing: go-cyberbrain embraces a data-driven approach, seamlessly handling complex data flows. Its in-memory graph backend facilitates the storage, analysis, and enrichment of interconnected information.
-- Multithreaded by design: go-cyberbrain optimizes job execution by utilizing a multi threaded architecture. It ensures efficient processing, avoids duplication of tasks, and maximizes performance.
+---
 
-For more information on how cyberbrain works check the [workflow] page. It provides a more detailed explanation about the workflow itself and why it's different than current standard architectures. 
+### Key Features
+
+* **Graph-based Memory:** Uses **`gits`** (Graph-based In-memory Transactional Storage) to store all information, including system state and learned data, as an interconnected graph.
+* **Decentralized Work Units:** **`Neurons`** act as independent workers that discover, claim, and execute **`Jobs`**.
+* **Reactive Scheduling:** The system autonomously creates new **`Jobs`** by detecting patterns in newly acquired or modified knowledge. This process is driven by the **`Scheduler`**, which reacts to changes in the graph. **Crucially, scheduling is decentralized; `Neurons` contribute to the scheduling process directly after completing their tasks.**
+* **Pluggable Actions:** Developers can extend the system's capabilities by implementing custom **`Actions`** that perform specific tasks or integrate with external systems.
+* **Self-Awareness:** `go-cyberbrain` stores its own operational state and configuration within its `gits` memory, allowing for introspection and dynamic management.
+
+---
+
+### Possible Use Cases
+
+`go-cyberbrain`'s reactive, graph-driven nature lends itself to scenarios requiring automated information processing and response. Examples include:
+
+* **Cybersecurity Analysis:** Identifying related security incidents, mapping network assets and vulnerabilities, and triggering automated remediation steps based on discovered relationships (e.g., "if this IP is malicious and connected to this internal host, then block it").
+* **Infrastructure Automation:** Managing the state of dynamic infrastructure, where changes in one component (e.g., a new service deployment) can automatically trigger configuration updates or health checks in related components.
+* **Data Lineage and Transformation:** Tracking how data flows through various systems, identifying data quality issues, and triggering transformation or enrichment processes based on data characteristics or new inputs.
+* **Supply Chain Monitoring:** Mapping complex supply chain relationships, detecting anomalies (e.g., delays from a specific supplier affecting downstream processes), and initiating alerts or alternative routing actions.
+* **IoT Device Management:** Monitoring state changes in interconnected devices, processing sensor data, and automating control actions or alerts based on predefined rules and contextual information derived from the graph.
+
+---
 
 ### Getting Started
 
-To explore the capabilities of go-cyberbrain and start building intelligent applications, follow these steps:
+To run the example demonstrating how `go-cyberbrain` resolves IP addresses for a domain, refer to the [Getting Started Documentation](docs/GETTING_STARTED.md).
 
-1. Clone go-cyberbrain to a directory of your choice
-2. Starting in the project root directory 
-```
-cd ./cmd/cyberbrain
-go build -o cyberbrain && cp cyberbrain ~/go/bin
-```
-3. Make sure ~/go/bin is in your PATH. You may choose another directory to store the binary which is in your PATH, in that case modify the path given in Step 2. command to your desired destination.
-4. Clone the example project repo [url] into a directory of your choice. This will turn into your project.
-5. Use the following command to make sure your cyberbrain installation works fine, startin in the example projects root directory
-```
-cyberbrain test
-```
-6. If cyberbrain test finishes without errors your installation seems to be fine. If errors occure please check the [troubbleshooting] section.
+---
 
-You now have a working version of cyberbrain setup for development and usage on your system. Since cyberbrain is an application architecture/framework it needs plugins to work. For information on plugin development check [your first project] or [plugin development]
+### Project Status
 
+`go-cyberbrain` is currently in a **Proof-of-Concept (POC) / pre-alpha state**. Its primary goal is to demonstrate the core mechanics of a reactive, graph-driven system. While functional, it is not yet production-ready and is undergoing active development and refinement.
 
+Due to its volatile state of development, contributions are generally **not being sought or applied at this time**. The project's structure and APIs are subject to change without prior notice.
+
+---
+
+### License
+
+`go-cyberbrain` is open-source software licensed under the [Apache License](LICENSE).
