@@ -1,10 +1,10 @@
 package cerebrum
 
 import (
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"strconv"
 	"strings"
 )
@@ -12,12 +12,14 @@ import (
 type Scheduler struct {
 	memory        *Memory
 	demultiplexer *Demultiplexer
+	log           *archivist.Archivist
 }
 
-func NewScheduler(memory *Memory, demultiplexerInstance *Demultiplexer) *Scheduler {
+func NewScheduler(memory *Memory, demultiplexerInstance *Demultiplexer, logger *archivist.Archivist) *Scheduler {
 	return &Scheduler{
 		memory:        memory,
 		demultiplexer: demultiplexerInstance,
+		log:           logger,
 	}
 }
 
@@ -25,7 +27,7 @@ func (s *Scheduler) Run(data transport.TransportEntity, cortex *Cortex) {
 	// first we need to demultiplex the data we just gathered.
 	// based on the results we can than identify and build new job payloads
 	demultiplexedData := s.demultiplexer.Parse(data)
-	archivist.Debug("Demultiplexed input", demultiplexedData)
+	s.log.Debug("Demultiplexed input", demultiplexedData)
 
 	newRelationStructures := make(map[string][2]*transport.TransportEntity)
 	newRelationStructures = s.rFilterRelationStructures(data, newRelationStructures)
@@ -62,9 +64,9 @@ func (s *Scheduler) createNewJobs(entity transport.TransportEntity, newRelationS
 	// by recursively walking the given data
 	lookup := make(map[string]int)
 	var pointer [][]*transport.TransportEntity
-	archivist.Debug("Enrich lookup by entity", entity)
+	s.log.Debug("Enrich lookup by entity", entity)
 	lookup, pointer = s.rEnrichLookupAndPointer(entity, lookup, pointer)
-	archivist.Debug("Lookup data", lookup, pointer)
+	s.log.Debug("Lookup data", lookup, pointer)
 	// now we going to retrieve all action+dependency combos to that could potentially
 	// be executed based on the new learned data which we just identified and stored
 	// in our lookup/pointer variables
@@ -72,18 +74,18 @@ func (s *Scheduler) createNewJobs(entity transport.TransportEntity, newRelationS
 	for entityType := range lookup {
 		actionsAndDependencies = append(actionsAndDependencies, s.retrieveActionsByType(entityType)...)
 	}
-	archivist.Debug("Action and dependency found to input", actionsAndDependencies)
+	s.log.Debug("Action and dependency found to input", actionsAndDependencies)
 
 	// now also gonne lookup & enrich the actionsAndDependencies based on the newRelationStructures
 	if 0 < len(newRelationStructures) {
-		archivist.Debug("New relevant relation structures found in scheduler %+v", newRelationStructures)
-		archivist.Debug("actionsAndDependencies before enrichin by relation structures", actionsAndDependencies)
+		s.log.Debug("New relevant relation structures found in scheduler %+v", newRelationStructures)
+		s.log.Debug("actionsAndDependencies before enrichin by relation structures", actionsAndDependencies)
 		actionsAndDependencies = s.enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures, actionsAndDependencies)
-		archivist.Debug("actionsAndDependencies after enrichin by relation structures", actionsAndDependencies)
-		archivist.Debug("lookupAndPointer before enrichment by relation structures", lookup, pointer)
+		s.log.Debug("actionsAndDependencies after enrichin by relation structures", actionsAndDependencies)
+		s.log.Debug("lookupAndPointer before enrichment by relation structures", lookup, pointer)
 		lookup, pointer = s.enrichLookupAndPointerByRelationStructures(newRelationStructures, lookup, pointer)
-		archivist.Debug("lookupAndPointer after enrichment by relation structures", lookup, pointer)
-		archivist.Debug("lookupAndPointer input structure", entity)
+		s.log.Debug("lookupAndPointer after enrichment by relation structures", lookup, pointer)
+		s.log.Debug("lookupAndPointer input structure", entity)
 	}
 
 	// at this point we go a single possible input structure and all potential actions/dependencies
@@ -93,17 +95,17 @@ func (s *Scheduler) createNewJobs(entity transport.TransportEntity, newRelationS
 	for _, actionAndDependency := range actionsAndDependencies {
 		act, _ := cortex.GetAction(actionAndDependency[0])
 		requirement := act.GetDependencyByName(actionAndDependency[1])
-		archivist.Debug("Trying to enrich data based on ", actionAndDependency)
+		s.log.Debug("Trying to enrich data based on ", actionAndDependency)
 		newJobInputs := s.buildInputData(requirement.Children()[0], lookup, pointer)
 		//inputData, err := rBuildInputData(requirement.Children()[0], entity, pointer, lookup, false, "", -1, nil)
 		if 0 < len(newJobInputs) {
 			for _, inputData := range newJobInputs {
-				archivist.Debug("Created a new job with payload", inputData)
-				newJob := NewJob(s.memory)
+				s.log.Debug("Created a new job with payload", inputData)
+				newJob := NewJob(s.memory, s.log)
 				newJob.Create(act.GetName(), actionAndDependency[1], inputData)
 			}
 		} else {
-			archivist.Debug("Requirement could not be satisfied", requirement)
+			s.log.Debug("Requirement could not be satisfied", requirement)
 		}
 
 	}
@@ -126,7 +128,7 @@ func (s *Scheduler) enrichLookupAndPointerByRelationStructures(newRelationStruct
 func (s *Scheduler) enrichActionsAndDependenciesByNewRelationStructures(newRelationStructures map[string][2]*transport.TransportEntity, actionsAndDependencies [][2]string) [][2]string {
 	for relationStructure, _ := range newRelationStructures {
 		actions := s.retrieveActionsByRelationStructure(relationStructure)
-		archivist.Debug("Retrieved actions by relationStructure "+relationStructure, actions)
+		s.log.Debug("Retrieved actions by relationStructure "+relationStructure, actions)
 		for _, action := range actions {
 			add := true
 			for _, val := range actionsAndDependencies {
@@ -183,7 +185,7 @@ func (s *Scheduler) enrichQueryFilters(query *query.Query, requirement transport
 			splitName := strings.Split(name, ".")
 			// invalid structure
 			if len(splitName) != 3 {
-				archivist.Error("invalid filter format name: %s : skipping filter", name)
+				s.log.Error("invalid filter format name: %s : skipping filter", name)
 				continue // ### maybe should be handled different
 			}
 			key := splitName[1]
@@ -215,7 +217,7 @@ func (s *Scheduler) retrieveActionsByType(entityType string) [][2]string {
 		),
 	)
 	result := gits.GetDefault().Query().Execute(qry)
-	archivist.Debug("DependencyEntityLookup ", entityType, result)
+	s.log.Debug("DependencyEntityLookup ", entityType, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {
 			for _, actionEntity := range dependencyEntity.Parents() { // ### todo : this is a very wierd behaviour, it works for us here but one would expect to also find the DependencyEntityLookup when checking the parents. but due to the way we build the return json tree its not
@@ -234,7 +236,7 @@ func (s *Scheduler) retrieveActionsByRelationStructure(relationStructure string)
 		),
 	)
 	result := gits.GetDefault().Query().Execute(qry)
-	archivist.Debug("DependencyRelationLookup ", relationStructure, result)
+	s.log.Debug("DependencyRelationLookup ", relationStructure, result)
 	if 0 < len(result.Entities) {
 		for _, dependencyEntity := range result.Entities[0].Children() {
 			for _, actionEntity := range dependencyEntity.Parents() { // ### todo : this is a very wierd behaviour, it works for us here but one would expect to also find the DependencyEntityLookup when checking the parents. but due to the way we build the return json tree its not
@@ -246,14 +248,14 @@ func (s *Scheduler) retrieveActionsByRelationStructure(relationStructure string)
 }
 
 func (s *Scheduler) rEnrichLookupAndPointer(entity transport.TransportEntity, lookup map[string]int, pointer [][]*transport.TransportEntity) (map[string]int, [][]*transport.TransportEntity) {
-	archivist.Debug("Enrichting step", entity)
+	s.log.Debug("Enrichting step", entity)
 	// lets see if this is newly learned data
 	if _, ok := entity.Properties["bMap"]; ok {
 		// do we already know about this entity type?
 		if _, well := lookup[entity.Type]; !well {
 			// it's not known, so we create wa whole new first level entry on pointer and
 			// also add it to our lookup map for later use
-			archivist.Debug("Adding entity to pointer", entity)
+			s.log.Debug("Adding entity to pointer", entity)
 			pointer = append(pointer, []*transport.TransportEntity{&entity})
 			lookup[entity.Type] = len(pointer) - 1
 		} else {

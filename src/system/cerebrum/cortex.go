@@ -2,9 +2,9 @@ package cerebrum
 
 import (
 	"errors"
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/query"
 	"github.com/voodooEntity/gits/src/transport"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
@@ -12,12 +12,14 @@ import (
 type Cortex struct {
 	register map[string]*Action
 	memory   *Memory
+	log      *archivist.Archivist
 }
 
-func NewCortex(memoryInstance *Memory) *Cortex {
+func NewCortex(memoryInstance *Memory, logger *archivist.Archivist) *Cortex {
 	return &Cortex{
 		register: make(map[string]*Action),
 		memory:   memoryInstance,
+		log:      logger,
 	}
 }
 
@@ -41,7 +43,7 @@ func (c *Cortex) RegisterAction(name string, factory func() interfaces.ActionInt
 	// recursive filter all upcoming dependency types and map them onto lookup nodes for further faster processing
 	for _, val := range actionInstance.GetDependencies() {
 		dependencyTypeList := c.getDependencyStructureTypes(val)
-		archivist.Debug("Mapping dependency lookup ", dependencyTypeList, val.ID)
+		c.log.Debug("Mapping dependency lookup ", dependencyTypeList, val.ID)
 		c.mapDependencyEntityLookupNodes(dependencyTypeList, val.ID)
 		c.mapDependencyRelationLookupNodes(val)
 	}
@@ -68,7 +70,7 @@ func (c Cortex) GetInstance(name string) (interfaces.ActionInterface, error) {
 func (c Cortex) mapDependencyRelationLookupNodes(entity transport.TransportEntity) {
 	var relationStructures []string
 	relationStructures = c.rFindRelationStructures(entity, relationStructures)
-	archivist.Info("Relation structures found in cortex ", relationStructures)
+	c.log.Info("Relation structures found in cortex ", relationStructures)
 	for _, val := range relationStructures {
 		c.memory.Gits.MapData(transport.TransportEntity{
 			Type:       "DependencyRelationLookup",
