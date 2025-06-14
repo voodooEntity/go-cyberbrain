@@ -1,21 +1,23 @@
 package cerebrum
 
 import (
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/storage"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/gits/src/types"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 )
 
 type Mapper struct {
 	gits *gits.Gits
+	log  *archivist.Archivist
 }
 
-func NewMapper(gits *gits.Gits) *Mapper {
+func NewMapper(gits *gits.Gits, logger *archivist.Archivist) *Mapper {
 	return &Mapper{
 		gits: gits,
+		log:  logger,
 	}
 }
 
@@ -31,7 +33,7 @@ func (m *Mapper) MapTransportData(data transport.TransportEntity) transport.Tran
 	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
-	archivist.DebugF("MapTransportData ", data)
+	m.log.DebugF("MapTransportData ", data)
 	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", false, nil)
 
 	// now we unlock all the mutexes again
@@ -49,7 +51,7 @@ func (m *Mapper) MapTransportDataWithContext(data transport.TransportEntity, con
 	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
-	archivist.DebugF("MapTransportDataWithContext ", data)
+	m.log.DebugF("MapTransportDataWithContext ", data)
 	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, false, nil)
 
 	// now we unlock all the mutexes again
@@ -67,7 +69,7 @@ func (m *Mapper) MapTransportDataWithContextForceCreate(data transport.Transport
 	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
-	archivist.DebugF("MapTransportDataWithContextForceCreate ", data)
+	m.log.DebugF("MapTransportDataWithContextForceCreate ", data)
 	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, context, true, nil)
 
 	// now we unlock all the mutexes again
@@ -85,7 +87,7 @@ func (m *Mapper) MapTransportDataForceCreate(data transport.TransportEntity) tra
 	m.gits.Storage().RelationStorageMutex.Lock()
 
 	// lets start recursive mapping of the data
-	archivist.DebugF("MapTransportDataForceCreate ", data)
+	m.log.DebugF("MapTransportDataForceCreate ", data)
 	ret := m.mapRecursive(data, -1, -1, storage.DIRECTION_NONE, "", true, nil)
 
 	// now we unlock all the mutexes again
@@ -267,7 +269,7 @@ func (m *Mapper) mapRecursive(entity transport.TransportEntity, relatedType int,
 		// add  only add such structures that should trigger a follow up job. but marking all new entities would be more correct
 		if _, ok := ctx.SourceEntity.Properties["bMap"]; !ok && !createEntity {
 			ctx.SourceRelation.Properties = map[string]string{"bMap": ""}
-			archivist.Debug("Created relation from " + ctx.SourceEntity.Type + " to " + entity.Type + " without surrounding new entities")
+			m.log.Debug("Created relation from " + ctx.SourceEntity.Type + " to " + entity.Type + " without surrounding new entities")
 		}
 	}
 	// only the first return is interesting since it
@@ -277,9 +279,9 @@ func (m *Mapper) mapRecursive(entity transport.TransportEntity, relatedType int,
 }
 
 func (m *Mapper) getRelatedEntityWithTypeAndValue(entity transport.TransportEntity, entityTypeID int, relatedType int, relatedID int, direction int) (transport.TransportEntity, bool, error) {
-	archivist.Debug("Trying to find related entity by type, value and related addr", entity, entityTypeID, relatedType, relatedID, direction)
+	m.log.Debug("Trying to find related entity by type, value and related addr", entity, entityTypeID, relatedType, relatedID, direction)
 	entities, err := m.gits.Storage().GetEntitiesByTypeAndValueUnsafe(entity.Type, entity.Value, "match", "")
-	archivist.Debug("Followin entities retrieved by type and value", entities)
+	m.log.Debug("Followin entities retrieved by type and value", entities)
 
 	// we skipping on error here. this errors can only appear if given entity.Type doesnt exist.
 	// maybe recheck later ### | also hitting this case if we got 0 entities in return

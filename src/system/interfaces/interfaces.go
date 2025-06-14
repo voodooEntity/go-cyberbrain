@@ -8,3 +8,7 @@ type ActionInterface interface {
 	Execute(transport.TransportEntity, string, string) ([]transport.TransportEntity, error)
 	GetConfig() transport.TransportEntity
 }
+
+type LoggerInterface interface {
+	Println(v ...interface{})
+}

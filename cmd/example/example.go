@@ -1,28 +1,33 @@
 package main
 
 import (
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/storage"
+	"os"
+
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain"
 	"github.com/voodooEntity/go-cyberbrain/src/example"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
-	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
+	"log"
 )
 
 func main() {
+	//logger := log.New(io.Discard, "", 0)
+	logger := log.New(os.Stdout, "", 0)
+
 	// create base instance. ident is required.
 	// NeuronAmount will default back to
 	// runtime.NumCPU == num logical cpu's
 	cb := cyberbrain.New(cyberbrain.Settings{
 		NeuronAmount: 1,
 		Ident:        "GreatName",
+		LogLevel:     archivist.LEVEL_INFO,
+		Logger:       logger,
 	})
 
 	// register actions
-	cb.RegisterAction("resolveIPFromDomain", func() interfaces.ActionInterface {
-		return example.New()
-	})
+	cb.RegisterAction("resolveIPFromDomain", example.New)
 
 	// start the neurons
 	cb.Start()
@@ -42,7 +47,7 @@ func main() {
 	obsi := cb.GetObserverInstance(func(mi *cerebrum.Memory) {
 		qry := mi.Gits.Query().New().Read("IP")
 		ret := mi.Gits.Query().Execute(qry)
-		archivist.Info("Result:", ret)
+		logger.Println("Result:", ret)
 	}, true)
 
 	// blocking while neurons are

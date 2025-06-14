@@ -1,8 +1,8 @@
 package observer
 
 import (
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits/src/query"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
 	"time"
@@ -15,6 +15,7 @@ type Observer struct {
 	callback          func(memoryInstance *cerebrum.Memory)
 	Runners           []Tracker
 	lethal            bool
+	log               *archivist.Archivist
 }
 
 type Tracker struct {
@@ -22,8 +23,8 @@ type Tracker struct {
 	Version int
 }
 
-func New(memoryInstance *cerebrum.Memory, runnerAmount int, cb func(memoryInstance *cerebrum.Memory), lethal bool) *Observer {
-	archivist.Info("Creating observer")
+func New(memoryInstance *cerebrum.Memory, runnerAmount int, cb func(memoryInstance *cerebrum.Memory), logger *archivist.Archivist, lethal bool) *Observer {
+	logger.Info("Creating observer")
 	var runners []Tracker
 	qry := query.New().Read("Neuron")
 	res := memoryInstance.Gits.Query().Execute(qry)
@@ -41,23 +42,24 @@ func New(memoryInstance *cerebrum.Memory, runnerAmount int, cb func(memoryInstan
 		callback:          cb,
 		runnerAmount:      runnerAmount,
 		lethal:            lethal,
+		log:               logger,
 	}
 }
 
 func (o *Observer) Loop() {
 	for !o.ReachedEndgame() {
-		archivist.Debug("Observer looping:")
+		o.log.Debug("Observer looping:")
 		time.Sleep(100 * time.Millisecond)
 	}
 	o.Endgame()
-	archivist.Info("Cyberbrain has been shutdown, neuron exiting")
+	o.log.Info("Cyberbrain has been shutdown, neuron exiting")
 }
 
 func (o *Observer) ReachedEndgame() bool {
 	runnerQry := query.New().Read("Neuron").Match("Properties.State", "==", "Searching")
 	sysRunners := o.memory.Gits.Query().Execute(runnerQry)
-	archivist.Debug("Observer: searching neurons", sysRunners.Amount)
-	archivist.Debug("Observer: total amount created neurons", o.runnerAmount)
+	o.log.Debug("Observer: searching neurons", sysRunners.Amount)
+	o.log.Debug("Observer: total amount created neurons", o.runnerAmount)
 	openJobs := cerebrum.GetOpenJobs(o.memory.Gits)
 	if openJobs.Amount == 0 && sysRunners.Amount == o.runnerAmount {
 		changedVersion := false
@@ -86,7 +88,7 @@ func (o *Observer) ReachedEndgame() bool {
 }
 
 func (o *Observer) Endgame() {
-	archivist.Info("executing endgame")
+	o.log.Info("executing endgame")
 	// if we are lethal we gonne stop cyberbrain
 	if o.lethal {
 		util.Terminate(o.memory.Gits)

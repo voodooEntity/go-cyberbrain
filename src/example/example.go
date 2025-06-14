@@ -4,6 +4,7 @@ import (
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
+	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"net"
 	"strconv"
 	"time"
@@ -14,7 +15,7 @@ type Example struct {
 	Mapper *cerebrum.Mapper
 }
 
-func New() *Example {
+func New() interfaces.ActionInterface {
 	tmp := &Example{}
 	return tmp
 }

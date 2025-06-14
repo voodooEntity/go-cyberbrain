@@ -2,14 +2,15 @@ package cyberbrain
 
 import (
 	"errors"
-	"fmt"
-	"github.com/voodooEntity/archivist"
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
+	"github.com/voodooEntity/go-cyberbrain/src/system/archivist"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"github.com/voodooEntity/go-cyberbrain/src/system/observer"
 	"github.com/voodooEntity/go-cyberbrain/src/system/util"
+	"log"
+	"os"
 	"runtime"
 )
 
@@ -18,6 +19,7 @@ type Cyberbrain struct {
 	neuronAmount int
 	neurons      []int
 	con          cerebrum.Consciousness
+	log          *archivist.Archivist
 	initCfg      Settings
 }
 
@@ -25,12 +27,25 @@ type Settings struct {
 	Gits         *gits.Gits
 	Ident        string
 	NeuronAmount int
+	Logger       interfaces.LoggerInterface
+	LogLevel     int
 }
 
 func New(cfg Settings) *Cyberbrain {
+	// if no logger is provided we
+	// use the default go logger to
+	// stdout
+	if cfg.Logger == nil {
+		cfg.Logger = log.New(os.Stdout, "", 0)
+	}
+	arc := archivist.New(&archivist.Config{
+		Logger:   cfg.Logger,
+		LogLevel: cfg.LogLevel,
+	})
+
 	// ident is required
 	if cfg.Ident == "" {
-		archivist.Error("no ident given")
+		arc.Error("Error: no ident given, exiting")
 		return nil
 	}
 
@@ -40,6 +55,7 @@ func New(cfg Settings) *Cyberbrain {
 		con:          cerebrum.Consciousness{},
 		neuronAmount: runtime.NumCPU(), // default neuron amount is num logical cpus
 		neurons:      make([]int, 0),
+		log:          arc,
 	}
 
 	// if the given neuronAmount is
@@ -53,7 +69,7 @@ func New(cfg Settings) *Cyberbrain {
 
 	// with memory setup we can
 	// setup the cortex
-	instance.con.Cortex = cerebrum.NewCortex(instance.con.Memory)
+	instance.con.Cortex = cerebrum.NewCortex(instance.con.Memory, arc)
 
 	// now the "activity"
 	instance.setupActivity()
@@ -143,7 +159,7 @@ func (cb *Cyberbrain) Schedule(data transport.TransportEntity) error {
 }
 
 func (cb *Cyberbrain) GetObserverInstance(callback func(memoryInstance *cerebrum.Memory), lethal bool) *observer.Observer {
-	return observer.New(cb.con.Memory, cb.neuronAmount, callback, lethal)
+	return observer.New(cb.con.Memory, cb.neuronAmount, callback, cb.log, lethal)
 }
 
 //   - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -156,7 +172,7 @@ func (cb *Cyberbrain) setupActivity() {
 	activities.Demultiplexer = cerebrum.NewDemultiplexer()
 
 	// than scheduler
-	activities.Scheduler = cerebrum.NewScheduler(cb.con.Memory, activities.Demultiplexer)
+	activities.Scheduler = cerebrum.NewScheduler(cb.con.Memory, activities.Demultiplexer, cb.log)
 
 	// finally store it
 	cb.con.Activity = &activities
@@ -172,7 +188,7 @@ func (cb *Cyberbrain) setupMemory(customGits *gits.Gits) {
 
 	// based on the gits instance we gonne
 	// bootstrap the mapper
-	mapperInstance := cerebrum.NewMapper(gitsInstance)
+	mapperInstance := cerebrum.NewMapper(gitsInstance, cb.log)
 
 	// combine to memory and store
 	cb.con.Memory = &cerebrum.Memory{
@@ -183,14 +199,13 @@ func (cb *Cyberbrain) setupMemory(customGits *gits.Gits) {
 
 func (cb *Cyberbrain) startNeurons() {
 	for i := 0; i < cb.neuronAmount; i++ {
-		instance := cerebrum.NewNeuron(i, cb.con.Cortex, cb.con.Memory, cb.con.Activity)
+		instance := cerebrum.NewNeuron(i, cb.con.Cortex, cb.con.Memory, cb.con.Activity, cb.log)
 		go instance.Loop()
 		cb.neurons = append(cb.neurons, i)
 	}
 }
 
 func (cb *Cyberbrain) bringToLife() {
-	fmt.Print("yes we get here")
 	properties := make(map[string]string)
 	properties["State"] = "Alive"
 	cb.con.Memory.Mapper.MapTransportData(transport.TransportEntity{
