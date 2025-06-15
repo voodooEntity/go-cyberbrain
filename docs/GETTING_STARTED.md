@@ -113,7 +113,7 @@ Before starting the system, you must register the `Actions` that your `Cyberbrai
 ```
 
 * `cb.RegisterAction(actionName string, actionFactoryFunc func() interfaces.ActionInterface)`:
-    * The `actionName` (e.g., `"resolveIPFromDomain"`) is a logical string name that identifies this action. It's often the `Value` property of the `Action` entity in its `GetConfig()`.
+    * The `actionName` (e.g., `"resolveIPFromDomain"`) is a logical string name that identifies this action. It must match the `Value` property of the `Action` entity in its `GetConfig()`.
     * The `actionFactoryFunc` is a function that returns a new instance of your action, typically a `New()` method from your action's package (e.g., `example.New` for `example.Example`).
 
 For a detailed explanation on how to **implement** a custom `Action` and its `GetConfig()` method, refer to the [Developing Custom Actions Documentation](https://www.google.com/search?q=docs/ACTIONS.md).

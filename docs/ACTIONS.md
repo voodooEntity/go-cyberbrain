@@ -142,7 +142,7 @@ package example
 
 // ... imports and Example struct definition ...
 
-func NewExample() *Example {
+func NewExample() interfaces.ActionInterface  {
     return &Example{}
 }
 ```
@@ -159,11 +159,10 @@ import (
 func main() {
     // ... setup gits, archivist ...
 
-    cortex := cerebrum.NewCortex(gitsInstance, archivistInstance)
-    // Register your action using its New method
-    cortex.RegisterAction(example.NewExample())
+    
+    // Register your action using your previously created cyberbrain instanced cb
+    cb.RegisterAction("resolveIpFromDeomain",example.NewExample)
 
-    // ... proceed with Cyberbrain initialization and start ...
 }
 ```
 
