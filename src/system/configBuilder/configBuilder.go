@@ -135,7 +135,7 @@ func (s *Structure) Transform() transport.TransportEntity {
 
 	// add the children
 	for _, child := range s.Children {
-		currEntity.ChildRelations = append(currEntity.ParentRelations, transport.TransportRelation{
+		currEntity.ChildRelations = append(currEntity.ChildRelations, transport.TransportRelation{
 			Target: child.Transform(),
 		})
 	}
