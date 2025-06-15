@@ -4,6 +4,7 @@ import (
 	"github.com/voodooEntity/gits"
 	"github.com/voodooEntity/gits/src/transport"
 	"github.com/voodooEntity/go-cyberbrain/src/system/cerebrum"
+	cfgb "github.com/voodooEntity/go-cyberbrain/src/system/configBuilder"
 	"github.com/voodooEntity/go-cyberbrain/src/system/interfaces"
 	"net"
 	"strconv"
@@ -65,41 +66,17 @@ func (self *Example) Execute(input transport.TransportEntity, requirement string
 }
 
 func (self *Example) GetConfig() transport.TransportEntity {
-	return transport.TransportEntity{
-		ID:         -1,
-		Type:       "Action",
-		Value:      "resolveIPFromDomain",
-		Context:    "System",
-		Properties: make(map[string]string),
-		ChildRelations: []transport.TransportRelation{
-			{
-				Target: transport.TransportEntity{
-					ID:         -1,
-					Type:       "Dependency",
-					Value:      "alpha",
-					Context:    "System",
-					Properties: make(map[string]string),
-					ChildRelations: []transport.TransportRelation{
-						{
-							Target: transport.TransportEntity{
-								ID:         -1,
-								Type:       "Structure",
-								Value:      "Domain",
-								Context:    "System",
-								Properties: map[string]string{"Mode": "Set", "Type": "Primary"},
-							},
-						},
-					},
-				},
-			},
-			{
-				Target: transport.TransportEntity{
-					Type:       "Category",
-					Value:      "Pentest",
-					Properties: make(map[string]string),
-					Context:    "System",
-				},
-			},
-		},
-	}
+	// instance config and set base infos
+	cfg := cfgb.NewConfig()
+	cfg.SetName("resolveIPFromDomain")
+	cfg.SetCategory("Pentest")
+
+	// define a dependency
+	alphaDependency := cfgb.NewStructure("Domain").SetPriority(cfgb.PRIORITY_PRIMARY).SetMode(cfgb.MODE_SET)
+
+	// add dependency to config
+	cfg.AddDependency("alpha", alphaDependency)
+
+	// build the config format and return
+	return cfg.Build()
 }
