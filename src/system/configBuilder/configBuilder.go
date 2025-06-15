@@ -145,12 +145,12 @@ func (s *Structure) Transform() transport.TransportEntity {
 
 func (s *Structure) AddParent(parent *Structure) *Structure {
 	s.Parents = append(s.Parents, parent)
-	return parent
+	return s
 }
 
 func (s *Structure) AddChild(child *Structure) *Structure {
 	s.Children = append(s.Children, child)
-	return child
+	return s
 }
 
 func (s *Structure) SetPriority(priority Priority) *Structure {
